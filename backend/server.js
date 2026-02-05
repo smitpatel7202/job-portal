@@ -15,13 +15,56 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const app = express();
 
 // ============================================
+// HEALTH CHECK ENDPOINT
+// ============================================
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Job Portal API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// ============================================
 // MIDDLEWARE
 // ============================================
-app.use(cors());
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+ 
+    // In production, allow your Netlify domain
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5500',
+      'http://127.0.0.1:5500',
+      'https://your-frontend-domain.netlify.app' // Replace with your Netlify URL
+    ];
+ 
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+ 
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+ 
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const authMiddleware = async (req, res, next) => {
@@ -63,66 +106,36 @@ app.get('/uploads/resumes/:filename', (req, res, next) => {
 }, authMiddleware, async (req, res) => {
   try {
     const { filename } = req.params;
-    const safeFilename = path.basename(filename);
-    const filePath = path.join(process.env.UPLOAD_DIR || 'uploads', 'resumes', safeFilename);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).send('Resume not found');
-    }
-
+    
+    // For Cloudinary, we'll redirect to the secure URL
+    const publicId = `job-portal/resumes/${filename}`;
+    
     let isAllowed = false;
 
     if (req.user.role === 'admin' || req.user.role === 'employer') {
       isAllowed = true;
     } else {
       const user = await User.findOne({ _id: req.user.id });
-      if (user && user.resume && user.resume.endsWith(safeFilename)) {
+      if (user && user.resume && user.resume.includes(filename)) {
         isAllowed = true;
       }
     }
 
     if (!isAllowed) {
-      return res.status(403).send('Access denied');
+      return res.status(403).json({ error: 'Access denied' });
     }
 
-    const lowerName = safeFilename.toLowerCase();
-    const isPdf = lowerName.endsWith('.pdf');
-    if (lowerName.endsWith('.doc')) res.setHeader('Content-Type', 'application/msword');
-    else if (lowerName.endsWith('.docx')) res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    else res.setHeader('Content-Type', 'application/pdf');
+    // Generate secure Cloudinary URL
+    const secureUrl = cloudinary.url(publicId, {
+      secure: true,
+      resource_type: 'auto',
+      flags: 'attachment'
+    });
 
-    res.setHeader('Content-Disposition', (isPdf ? 'inline' : 'attachment') + '; filename="' + safeFilename + '"');
-    res.setHeader('Accept-Ranges', 'bytes');
-
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-    const range = req.headers.range;
-
-    if (range) {
-      const bytesPrefix = 'bytes=';
-      if (!range.startsWith(bytesPrefix)) {
-        return res.status(416).send('Invalid range');
-      }
-      const parts = range.substring(bytesPrefix.length).split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      if (Number.isNaN(start) || Number.isNaN(end) || start > end || end >= fileSize) {
-        return res.status(416).send('Invalid range');
-      }
-      res.status(206);
-      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
-      res.setHeader('Content-Length', end - start + 1);
-      const fileStream = fs.createReadStream(filePath, { start, end });
-      fileStream.pipe(res);
-      return;
-    }
-
-    res.setHeader('Content-Length', fileSize);
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
+    res.json({ url: secureUrl });
   } catch (error) {
-    console.error('File serve error:', error);
-    res.status(500).send('Server error');
+    console.error('Resume download error:', error);
+    res.status(500).json({ error: 'Failed to generate resume URL' });
   }
 });
 
@@ -137,32 +150,32 @@ app.use('/uploads', (req, res, next) => {
 
 
 
-const UPLOAD_ROOT = process.env.UPLOAD_DIR || 'uploads';
+// ============================================
+// CLOUDINARY CONFIGURATION
+// ============================================
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-const ensureDir = (dirPath) => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-};
-
-ensureDir(path.join(UPLOAD_ROOT, 'resumes'));
-ensureDir(path.join(UPLOAD_ROOT, 'logos'));
-ensureDir(path.join(UPLOAD_ROOT, 'profile-pics'));
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    let subDir = 'others';
-    if (file.fieldname === 'resume') subDir = 'resumes';
-    else if (file.fieldname === 'logo') subDir = 'logos';
-    else if (file.fieldname === 'profilePic') subDir = 'profile-pics';
-
-    const uploadPath = path.join(UPLOAD_ROOT, subDir);
-    ensureDir(uploadPath);
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
+// ============================================
+// FILE UPLOAD CONFIGURATION
+// ============================================
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: (req, file) => {
+      if (file.fieldname === 'resume') return 'job-portal/resumes';
+      else if (file.fieldname === 'logo') return 'job-portal/logos';
+      else if (file.fieldname === 'profilePic') return 'job-portal/profile-pics';
+      return 'job-portal/others';
+    },
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'],
+    public_id: (req, file) => {
+      const uniqueName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      return uniqueName;
+    }
   }
 });
 

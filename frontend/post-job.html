@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Post a Job - Job Portal</title>
+  <title>Post Job - Job Portal</title>
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
 </head>
 <body>
   <!-- Navigation -->
@@ -204,7 +206,7 @@
         showAlert('Failed to load profile: ' + error.message, 'error');
         // Try raw fetch to surface the server response for debugging
         try {
-          const rawResponse = await fetch((typeof API_URL !== 'undefined' ? API_URL : 'http://localhost:5000') + '/profile', {
+          const rawResponse = await fetch((window.API_CONFIG ? window.API_CONFIG.API_URL : 'http://localhost:5000/api') + '/profile', {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${getToken()}` }
           });

@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Profile - Job Portal</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Portal - Profile</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
 </head>
 <body>
   <nav class="navbar">
@@ -280,7 +282,7 @@
       // Resume
       if (data.resume) {
         const token = getToken();
-        const resumeUrl = data.resume.startsWith('http') ? data.resume : `http://localhost:5000${data.resume}`;
+        const resumeUrl = data.resume.startsWith('http') ? data.resume : `${window.API_CONFIG ? window.API_CONFIG.BASE_URL : 'http://localhost:5000'}${data.resume}`;
         const resumeWithToken = token ? `${resumeUrl}${resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : resumeUrl;
         const isPdf = data.resume.toLowerCase().endsWith('.pdf');
         document.getElementById('resumeSection').innerHTML = `
@@ -379,7 +381,7 @@
       formData.append('resume', file);
 
       try {
-        const response = await fetch('http://localhost:5000/api/profile/resume', {
+        const response = await fetch(`${window.API_CONFIG ? window.API_CONFIG.API_URL : 'http://localhost:5000/api'}/profile/resume`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${getToken()}`
@@ -410,7 +412,7 @@
       formData.append('logo', file);
 
       try {
-        const response = await fetch('http://localhost:5000/api/profile/logo', {
+        const response = await fetch(`${window.API_CONFIG ? window.API_CONFIG.API_URL : 'http://localhost:5000/api'}/profile/logo`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${getToken()}`

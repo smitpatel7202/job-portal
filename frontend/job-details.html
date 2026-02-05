@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Job Details - Job Portal</title>
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>
+  <script src="auth.js"></script>
 </head>
 <body>
   <nav class="navbar">
@@ -204,7 +206,7 @@
           const companyInfo = job.postedBy;
           if (companyInfo.companyLogo) {
             document.getElementById('companyLogo').innerHTML = 
-              `<img src="http://localhost:5000${companyInfo.companyLogo}" alt="Company Logo" style="max-width: 150px; border-radius: 8px;">`;
+              `<img src="${window.API_CONFIG ? window.API_CONFIG.BASE_URL : 'http://localhost:5000'}${companyInfo.companyLogo}" alt="Company Logo" style="max-width: 150px; border-radius: 8px;">`;
           }
           document.getElementById('companyName').textContent = companyInfo.companyName || job.company;
           if (companyInfo.industry) {
@@ -258,7 +260,7 @@
           document.getElementById('companyName').textContent = job.company;
           if (job.postedBy && job.postedBy.companyLogo) {
             document.getElementById('companyLogo').innerHTML = 
-              `<img src="http://localhost:5000${job.postedBy.companyLogo}" alt="Company Logo" style="max-width: 150px; border-radius: 8px;">`;
+              `<img src="${window.API_CONFIG ? window.API_CONFIG.BASE_URL : 'http://localhost:5000'}${job.postedBy.companyLogo}" alt="Company Logo" style="max-width: 150px; border-radius: 8px;">`;
           }
           if (job.postedBy && job.postedBy.isVerified) {
             document.getElementById('verifiedBadge').innerHTML = 

@@ -2,7 +2,8 @@
 // AUTH.JS - Authentication Logic
 // ============================================
 
-const API_URL = 'http://localhost:5000/api'; // Change to your backend URL
+// Load configuration
+const API_URL = window.API_CONFIG ? window.API_CONFIG.API_URL : 'http://localhost:5000/api';
 
 // ============================================
 // UTILITY FUNCTIONS
