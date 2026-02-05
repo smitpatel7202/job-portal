@@ -46,7 +46,7 @@ const corsOptions = {
       'http://localhost:3000',
       'http://localhost:5500',
       'http://127.0.0.1:5500',
-      'https://your-frontend-domain.netlify.app' // Replace with your Netlify URL
+      'https://job-1portal.netlify.app' // Your Netlify URL
     ];
  
     if (process.env.NODE_ENV === 'development') {

@@ -6,11 +6,11 @@ const isProduction = window.location.hostname !== 'localhost' && window.location
 
 // API URLs
 const API_URL = isProduction 
-  ? 'https://job-portal-backend-byb6.onrender.com'  // Replace with your Render URL
+  ? 'https://job-portal-backend-byb6.onrender.com/api'  // Your Render URL
   : 'http://localhost:5000/api';
 
 const BASE_URL = isProduction
-  ? 'https://job-portal-backend-byb6.onrender.com'     // Replace with your Render URL
+  ? 'https://job-portal-backend-byb6.onrender.com'     // Your Render URL
   : 'http://localhost:5000';
 
 // Export for use in other files
