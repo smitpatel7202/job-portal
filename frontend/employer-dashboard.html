@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employer Dashboard - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks">
+        <a href="post-job.html">Post Job</a>
+        <a href="employer-dashboard.html">Dashboard</a>
+        <a href="profile.html">Profile</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <section class="dashboard">
+    <div class="container">
+      <div class="dashboard-header">
+        <h2>👔 Employer Dashboard</h2>
+        <p>Manage your job postings and view applications</p>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <!-- Quick Stats -->
+      <div class="dashboard-stats">
+        <div class="stat-card">
+          <h3 id="totalJobs">0</h3>
+          <p>Total Jobs</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="pendingJobs">0</h3>
+          <p>Pending Approval</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="approvedJobs">0</h3>
+          <p>Approved Jobs</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="totalApplications">0</h3>
+          <p>Total Applications</p>
+        </div>
+      </div>
+
+      <!-- My Jobs -->
+      <div class="dashboard-section">
+        <h3>💼 My Job Postings</h3>
+        
+        <div id="loadingJobs" class="loading">
+          <div class="spinner"></div>
+          <p>Loading your jobs...</p>
+        </div>
+
+        <div id="myJobs"></div>
+
+        <div id="emptyJobs" class="empty-state" style="display: none;">
+          <h3>No Jobs Posted Yet</h3>
+          <p>Post your first job using the form above!</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+  <script>
+    // Protect route - only employers allowed
+    if (!protectRoute(['employer'])) {
+      throw new Error('Access denied');
+    }
+
+    // Post new job
+    async function postJob(event) {
+      event.preventDefault();
+
+      const requiredSkillsInput = document.getElementById('requiredSkills').value;
+      const requiredSkills = requiredSkillsInput ? requiredSkillsInput.split(',').map(s => s.trim()).filter(s => s) : [];
+
+      const jobData = {
+        title: document.getElementById('title').value,
+        company: document.getElementById('company').value,
+        location: document.getElementById('location').value,
+        type: document.getElementById('type').value,
+        category: document.getElementById('category').value,
+        salary: document.getElementById('salary').value,
+        description: document.getElementById('description').value,
+        workMode: document.getElementById('workMode').value,
+        experienceLevel: document.getElementById('experienceLevel').value,
+        openings: parseInt(document.getElementById('openings').value) || 1,
+        requiredSkills: requiredSkills,
+        applicationDeadline: document.getElementById('applicationDeadline').value || null
+      };
+
+      try {
+        const data = await apiRequest('/jobs', {
+          method: 'POST',
+          body: JSON.stringify(jobData),
+        });
+
+        showAlert(data.message || 'Job posted successfully!', 'success');
+        event.target.reset();
+        loadMyJobs();
+      } catch (error) {
+        showAlert('Failed to post job: ' + error.message, 'error');
+      }
+    }
+
+    // Load employer's jobs and stats
+    async function loadMyJobs() {
+      const loading = document.getElementById('loadingJobs');
+      const myJobs = document.getElementById('myJobs');
+      const emptyJobs = document.getElementById('emptyJobs');
+
+      try {
+        const data = await apiRequest('/employer/jobs');
+        
+        loading.style.display = 'none';
+
+        // Calculate stats
+        const stats = {
+          total: data.length,
+          pending: data.filter(job => job.status === 'pending').length,
+          approved: data.filter(job => job.status === 'approved').length,
+          totalApplications: 0
+        };
+
+        // Count total applications
+        for (const job of data) {
+          stats.totalApplications += (job.applicationsCount || 0);
+        }
+
+        if (document.getElementById('totalJobs')) {
+          document.getElementById('totalJobs').textContent = stats.total;
+          document.getElementById('pendingJobs').textContent = stats.pending;
+          document.getElementById('approvedJobs').textContent = stats.approved;
+          document.getElementById('totalApplications').textContent = stats.totalApplications;
+        }
+
+        if (data.length === 0) {
+          emptyJobs.style.display = 'block';
+          myJobs.innerHTML = '';
+          return;
+        }
+
+        emptyJobs.style.display = 'none';
+
+        myJobs.innerHTML = data.map(job => {
+          const hasNewApplications = job.hasNewApplications || false;
+          const deadlineStatus = job.deadlineStatus;
+          const openingStatus = job.openingStatus;
+          
+          return `
+          <div class="job-card ${hasNewApplications ? 'has-new-applications' : ''}">
+            <div class="job-header">
+              <div>
+                <h3 class="job-title">${job.title}</h3>
+                <span class="job-type">${job.type}</span>
+                ${hasNewApplications ? '<span class="new-applications-badge">🔔 New Applications</span>' : ''}
+                ${deadlineStatus === 'expired' ? '<span class="status-badge status-expired" style="background: #e74c3c; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 10px;">⏰ Deadline Expired</span>' : ''}
+                ${openingStatus === 'filled' ? '<span class="status-badge status-filled" style="background: #f39c12; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 10px;">✅ Positions Filled</span>' : ''}
+              </div>
+              <div class="job-actions">
+                <button class="btn btn-small btn-primary" onclick="viewApplications('${job._id}')">View Applications</button>
+                <button class="btn btn-small btn-danger" onclick="deleteJob('${job._id}')">Delete</button>
+              </div>
+            </div>
+            <div class="job-details">
+              <p><strong>📍 Location:</strong> ${job.location}</p>
+              <p><strong>💰 Salary:</strong> ${job.salary || 'Not disclosed'}</p>
+              <p><strong>👥 Openings:</strong> ${job.filledPositions || 0}/${job.openings || 1} (${job.availablePositions || 'Unlimited'} available)</p>
+              <p><strong>📅 Posted:</strong> ${new Date(job.createdAt).toLocaleDateString()}</p>
+              ${job.applicationDeadline ? `<p><strong>⏰ Deadline:</strong> ${new Date(job.applicationDeadline).toLocaleDateString()}</p>` : ''}
+              <p><strong>📊 Status:</strong> 
+                <span class="status-badge status-${job.status}" style="background: ${job.status === 'approved' ? '#27ae60' : job.status === 'pending' ? '#f39c12' : '#e74c3c'}; color: white; padding: 5px 15px; border-radius: 20px;">
+                  ${job.status === 'approved' ? '✅ Approved' : job.status === 'pending' ? '⏳ Pending' : '❌ Rejected'}
+                </span>
+              </p>
+            </div>
+            <div class="job-stats">
+              <div class="stat">
+                <span class="stat-number">${job.applicationsCount || 0}</span>
+                <span class="stat-label">Total Applications</span>
+              </div>
+              <div class="stat">
+                <span class="stat-number">${job.newApplicationsCount || 0}</span>
+                <span class="stat-label">New Applications</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      } catch (error) {
+        loading.style.display = 'none';
+        showAlert('Failed to load jobs: ' + error.message, 'error');
+      }
+    }
+
+    // View applications for a job
+    async function viewApplications(jobId) {
+      try {
+        const data = await apiRequest(`/jobs/${jobId}/applications`);
+        const token = getToken();
+        const resumeTokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+        
+        if (data.length === 0) {
+          showAlert('No applications yet for this job', 'info');
+          return;
+        }
+
+        // Create modal or expandable section
+        let applicationsHTML = '<div id="applicationsModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">';
+        applicationsHTML += '<div style="background: white; padding: 2rem; border-radius: 10px; max-width: 800px; max-height: 80vh; overflow-y: auto; position: relative;">';
+        applicationsHTML += '<button onclick="closeApplicationsModal()" style="position: absolute; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>';
+        applicationsHTML += '<h3 style="margin-bottom: 1.5rem;">Applications for this Job</h3>';
+        
+        data.forEach(app => {
+          const resumeUrl = `${API_URL.replace('/api', '')}/api/resume/${app.userId._id}${resumeTokenParam}`;
+          const isPdf = (app.userId.resume || '').toLowerCase().endsWith('.pdf');
+          applicationsHTML += `
+            <div class="application-card" style="border: 1px solid #ddd; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                  <h4 style="margin-bottom: 0.5rem;">${app.userId.name}</h4>
+                  <p>📧 ${app.userId.email}</p>
+                  ${app.userId.phone ? `<p>📞 ${app.userId.phone}</p>` : ''}
+                  ${app.userId.location ? `<p>📍 ${app.userId.location}</p>` : ''}
+                  <p style="color: #7f8c8d; font-size: 0.9rem;">Applied: ${new Date(app.appliedAt).toLocaleDateString()}</p>
+                  <button class="btn btn-small btn-primary" onclick="viewJobSeekerProfile('${app.userId._id}')" style="margin-top: 0.5rem; margin-right: 5px;">View Full Profile</button>
+                  <div class="resume-section" style="margin-top: 1rem;">
+                    ${app.userId.resume ? `
+                      <div style="margin-bottom: 0.5rem;">
+                        <a href="${resumeUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-small btn-secondary">📄 Download Resume</a>
+                      </div>
+                      ${isPdf ? `
+                        <div style="border: 1px solid #eee; height: 200px; width: 100%; background: #f9f9f9;">
+                          <object data="${resumeUrl}" type="application/pdf" width="100%" height="100%">
+                            <p style="padding: 1rem; text-align: center;">Unable to display resume preview. <a href="${resumeUrl}" target="_blank">Download to view</a></p>
+                          </object>
+                        </div>
+                      ` : '<p style="color: #7f8c8d; font-size: 0.9rem;">Preview not available for this file type</p>'}
+                    ` : '<span style="color: #7f8c8d; font-size: 0.9rem;">No resume uploaded</span>'}
+                  </div>
+                  ${app.coverLetter ? `<p style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 5px;"><strong>Cover Letter:</strong><br>${app.coverLetter}</p>` : ''}
+                  ${app.employerNotes ? `<p style="margin-top: 0.5rem; padding: 0.5rem; background: #fff3cd; border-radius: 5px;"><strong>Your Notes:</strong> ${app.employerNotes}</p>` : ''}
+                </div>
+                <div style="text-align: right;">
+                  <span class="status-badge status-${app.status}" style="display: inline-block; padding: 5px 15px; border-radius: 20px; margin-bottom: 10px;">${app.status}</span>
+                  <div style="display: flex; flex-direction: column; gap: 5px;">
+                    ${app.status === 'pending' ? `
+                      <button class="btn btn-success btn-small" onclick="updateApplicationStatus('${app._id}', 'shortlisted', '${jobId}')">Shortlist</button>
+                      <button class="btn btn-primary btn-small" onclick="updateApplicationStatus('${app._id}', 'accepted', '${jobId}')">Accept</button>
+                      <button class="btn btn-danger btn-small" onclick="updateApplicationStatus('${app._id}', 'rejected', '${jobId}')">Reject</button>
+                    ` : app.status === 'shortlisted' ? `
+                      <button class="btn btn-primary btn-small" onclick="updateApplicationStatus('${app._id}', 'accepted', '${jobId}')">Accept</button>
+                      <button class="btn btn-danger btn-small" onclick="updateApplicationStatus('${app._id}', 'rejected', '${jobId}')">Reject</button>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        
+        applicationsHTML += '</div></div>';
+        
+        document.body.insertAdjacentHTML('beforeend', applicationsHTML);
+
+      } catch (error) {
+        showAlert('Failed to load applications: ' + error.message, 'error');
+      }
+    }
+
+    function closeApplicationsModal() {
+      const modal = document.getElementById('applicationsModal');
+      if (modal) modal.remove();
+    }
+
+    // Update application status
+    async function updateApplicationStatus(appId, status, jobId) {
+      const notes = prompt('Add notes (optional):');
+      
+      try {
+        await apiRequest(`/applications/${appId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ status, employerNotes: notes || '' }),
+        });
+
+        showAlert(`Application ${status} successfully!`, 'success');
+        closeApplicationsModal();
+        if (jobId) viewApplications(jobId);
+      } catch (error) {
+        showAlert('Failed to update application: ' + error.message, 'error');
+      }
+    }
+
+    // Delete job
+    async function deleteJob(jobId) {
+      if (!confirm('Are you sure you want to delete this job?')) return;
+
+      try {
+        await apiRequest(`/jobs/${jobId}`, {
+          method: 'DELETE',
+        });
+
+        showAlert('Job deleted successfully', 'success');
+        loadMyJobs();
+      } catch (error) {
+        showAlert('Failed to delete job: ' + error.message, 'error');
+      }
+    }
+
+    // View job seeker profile
+    function viewJobSeekerProfile(userId) {
+      window.open(`jobseeker-profile.html?id=${userId}`, '_blank');
+    }
+
+    // Load jobs on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadMyJobs();
+    });
+  </script>
+</body>
+</html>

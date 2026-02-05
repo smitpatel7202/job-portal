@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Details - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks"></div>
+    </div>
+  </nav>
+
+  <section class="dashboard">
+    <div class="container">
+      <div id="alert" class="alert"></div>
+      
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading job details...</p>
+      </div>
+
+      <div id="jobDetails" style="display: none;">
+        <!-- Job Header -->
+        <div class="dashboard-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 10px; margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div>
+              <h1 id="jobTitle" style="margin-bottom: 0.5rem; color: white;"></h1>
+              <h3 id="jobCompany" style="margin-bottom: 1rem; color: white; font-weight: normal;"></h3>
+              <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <span id="jobLocation" style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px;"></span>
+                <span id="jobType" style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px;"></span>
+                <span id="jobWorkMode" style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px;"></span>
+                <span id="jobExperience" style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px;"></span>
+              </div>
+            </div>
+            <div id="verifiedBadge" style="text-align: right;"></div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+          <!-- Main Content -->
+          <div>
+            <!-- Job Description -->
+            <div class="dashboard-section">
+              <h3>📋 Job Description</h3>
+              <div id="jobDescription" style="line-height: 1.8; white-space: pre-wrap;"></div>
+            </div>
+
+            <!-- Requirements -->
+            <div class="dashboard-section">
+              <h3>🎯 Requirements & Skills</h3>
+              <div id="requiredSkills" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem;"></div>
+              <p id="openings" style="margin-top: 1rem; color: #7f8c8d;"></p>
+            </div>
+
+            <!-- Application Deadline -->
+            <div id="deadlineSection" class="dashboard-section" style="display: none;">
+              <h3>⏰ Application Deadline</h3>
+              <p id="applicationDeadline" style="font-size: 1.1rem; color: #e74c3c;"></p>
+            </div>
+          </div>
+
+          <!-- Sidebar -->
+          <div>
+            <!-- Company Info -->
+            <div class="dashboard-section">
+              <h3>🏢 About Company</h3>
+              <div id="companyInfo">
+                <div id="companyLogo" style="margin-bottom: 1rem;"></div>
+                <p id="companyName" style="font-weight: bold; font-size: 1.1rem; margin-bottom: 0.5rem;"></p>
+                <p id="companyIndustry" style="color: #7f8c8d; margin-bottom: 0.5rem;"></p>
+                <p id="companySize" style="color: #7f8c8d; margin-bottom: 1rem;"></p>
+                <div id="companyDescription" style="line-height: 1.8; margin-bottom: 1rem;"></div>
+                <div id="companyWebsite"></div>
+              </div>
+            </div>
+
+            <!-- Job Summary -->
+            <div class="dashboard-section">
+              <h3>💰 Salary</h3>
+              <p id="jobSalary" style="font-size: 1.2rem; font-weight: bold; color: #27ae60;"></p>
+            </div>
+
+            <!-- Apply Button -->
+            <div class="dashboard-section">
+              <button id="applyBtn" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1.1rem;" onclick="applyToJob()">
+                Apply Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+  <script>
+    let currentJobId = null;
+    let currentJob = null;
+
+    async function loadJobDetails() {
+      const urlParams = new URLSearchParams(window.location.search);
+      currentJobId = urlParams.get('id');
+      const appStatus = urlParams.get('status');
+      const fromDashboard = urlParams.get('from') === 'dashboard';
+
+      if (!currentJobId) {
+        showAlert('Job ID not provided', 'error');
+        return;
+      }
+
+      try {
+        // If coming from dashboard (any applicant), use special endpoint for full details
+        let job;
+        if (fromDashboard && appStatus) {
+          job = await apiRequest(`/applications/job/${currentJobId}/details`);
+        } else {
+          job = await apiRequest(`/jobs/${currentJobId}`);
+        }
+        currentJob = job;
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('jobDetails').style.display = 'block';
+
+        // Show application status banner if coming from dashboard
+        if (appStatus && fromDashboard) {
+          const statusBanner = document.createElement('div');
+          statusBanner.className = 'dashboard-section';
+          statusBanner.style.cssText = appStatus === 'shortlisted' 
+            ? 'background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;'
+            : appStatus === 'accepted' 
+            ? 'background: #cce5ff; border: 1px solid #b8daff; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;'
+            : appStatus === 'rejected'
+            ? 'background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;'
+            : 'background: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;';
+          
+          const statusText = appStatus === 'shortlisted' ? '⭐ Shortlisted' 
+            : appStatus === 'accepted' ? '✅ Accepted' 
+            : appStatus === 'rejected' ? '❌ Rejected' 
+            : '⏳ Pending';
+          
+          const statusColor = appStatus === 'shortlisted' ? '#155724'
+            : appStatus === 'accepted' ? '#004085'
+            : appStatus === 'rejected' ? '#721c24'
+            : '#856404';
+          
+          statusBanner.innerHTML = `
+            <h4 style="color: ${statusColor}; margin: 0;">Your Application Status: ${statusText}</h4>
+            ${appStatus === 'shortlisted' ? '<p style="color: #155724; margin: 0.5rem 0 0 0;">🎉 Congratulations! You have been shortlisted for this position!</p>' : ''}
+            ${appStatus === 'accepted' ? '<p style="color: #004085; margin: 0.5rem 0 0 0;">🎉 Congratulations! Your application has been accepted!</p>' : ''}
+          `;
+          
+          const jobDetails = document.getElementById('jobDetails');
+          jobDetails.parentNode.insertBefore(statusBanner, jobDetails);
+        }
+        document.getElementById('jobTitle').textContent = job.title;
+        document.getElementById('jobCompany').textContent = `🏢 ${job.company}`;
+        document.getElementById('jobLocation').textContent = `📍 ${job.location}`;
+        document.getElementById('jobType').textContent = job.type;
+        document.getElementById('jobWorkMode').textContent = job.workMode || 'On-site';
+        document.getElementById('jobExperience').textContent = `${job.experienceLevel || 'Entry'} Level`;
+        document.getElementById('jobDescription').textContent = job.description;
+        document.getElementById('jobSalary').textContent = job.salary || 'Salary not disclosed';
+        
+        // Show openings information
+        if (job.openings && job.filledPositions !== undefined) {
+          document.getElementById('openings').textContent = `Openings: ${job.filledPositions}/${job.openings} (${job.availablePositions} available)`;
+        } else {
+          document.getElementById('openings').textContent = `Openings: ${job.openings || 1}`;
+        }
+
+        // Skills
+        const skillsDiv = document.getElementById('requiredSkills');
+        if (job.requiredSkills && job.requiredSkills.length > 0) {
+          skillsDiv.innerHTML = job.requiredSkills.map(skill => 
+            `<span style="background: #3498db; color: white; padding: 5px 15px; border-radius: 20px;">${skill}</span>`
+          ).join('');
+        } else {
+          skillsDiv.innerHTML = '<p style="color: #7f8c8d;">No specific skills mentioned</p>';
+        }
+
+        // Deadline
+        if (job.applicationDeadline) {
+          const deadline = new Date(job.applicationDeadline);
+          document.getElementById('applicationDeadline').textContent = deadline.toLocaleDateString();
+          document.getElementById('deadlineSection').style.display = 'block';
+        }
+
+        // Company info
+        if (job.postedBy) {
+          const companyInfo = job.postedBy;
+          if (companyInfo.companyLogo) {
+            document.getElementById('companyLogo').innerHTML = 
+              `<img src="http://localhost:5000${companyInfo.companyLogo}" alt="Company Logo" style="max-width: 150px; border-radius: 8px;">`;
+          }
+          document.getElementById('companyName').textContent = companyInfo.companyName || job.company;
+          if (companyInfo.industry) {
+            document.getElementById('companyIndustry').textContent = `Industry: ${companyInfo.industry}`;
+          }
+          if (companyInfo.companySize) {
+            document.getElementById('companySize').textContent = `Size: ${companyInfo.companySize} employees`;
+          }
+          if (companyInfo.companyDescription) {
+            document.getElementById('companyDescription').textContent = companyInfo.companyDescription;
+          }
+          if (companyInfo.companyWebsite) {
+            document.getElementById('companyWebsite').innerHTML = 
+              `<a href="${companyInfo.companyWebsite}" target="_blank" class="btn btn-primary btn-small">Visit Website</a>`;
+          }
+          if (companyInfo.isVerified) {
+            document.getElementById('verifiedBadge').innerHTML = 
+              '<span style="background: #27ae60; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold;">✓ Verified Company</span>';
+          }
+        }
+
+        // Handle limited access
+        if (job.hasLimitedAccess) {
+          // Show limited access message
+          const limitedAccessDiv = document.createElement('div');
+          limitedAccessDiv.className = 'dashboard-section';
+          limitedAccessDiv.style.background = '#fff3cd';
+          limitedAccessDiv.style.border = '1px solid #ffeaa7';
+          limitedAccessDiv.style.borderRadius = '8px';
+          limitedAccessDiv.style.padding = '1.5rem';
+          limitedAccessDiv.style.marginBottom = '2rem';
+          limitedAccessDiv.innerHTML = `
+            <h3 style="color: #f39c12; margin-bottom: 1rem;">🔒 Limited Access</h3>
+            <p style="color: #856404; line-height: 1.6;">${job.message}</p>
+            <p style="color: #856404; font-size: 0.9rem; margin-top: 1rem;">
+              <strong>Note:</strong> If you have been shortlisted or accepted for this position, 
+              please access the job details through your applications dashboard for full access.
+            </p>
+          `;
+          
+          // Insert after job header
+          const jobHeader = document.querySelector('.dashboard-section');
+          jobHeader.parentNode.insertBefore(limitedAccessDiv, jobHeader.nextSibling);
+          
+          // Hide detailed sections
+          document.getElementById('jobDescription').parentElement.style.display = 'none';
+          document.getElementById('requiredSkills').parentElement.style.display = 'none';
+          document.getElementById('companyInfo').parentElement.style.display = 'none';
+          
+          // Show limited company info
+          document.getElementById('companyName').textContent = job.company;
+          if (job.postedBy && job.postedBy.companyLogo) {
+            document.getElementById('companyLogo').innerHTML = 
+              `<img src="http://localhost:5000${job.postedBy.companyLogo}" alt="Company Logo" style="max-width: 150px; border-radius: 8px;">`;
+          }
+          if (job.postedBy && job.postedBy.isVerified) {
+            document.getElementById('verifiedBadge').innerHTML = 
+              '<span style="background: #27ae60; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold;">✓ Verified Company</span>';
+          }
+        } else {
+          // Show full details for authorized users
+          // Show position availability info
+          if (job.filledPositions !== undefined && job.availablePositions !== undefined) {
+            const availabilityInfo = document.createElement('div');
+            availabilityInfo.className = 'dashboard-section';
+            availabilityInfo.style.background = '#e8f5e8';
+            availabilityInfo.style.border = '1px solid #27ae60';
+            availabilityInfo.style.borderRadius = '8px';
+            availabilityInfo.style.padding = '1rem';
+            availabilityInfo.style.marginBottom = '1rem';
+            availabilityInfo.innerHTML = `
+              <h4 style="color: #27ae60; margin-bottom: 0.5rem;">📊 Position Status</h4>
+              <p style="color: #2c3e50; margin: 0;">
+                <strong>Filled Positions:</strong> ${job.filledPositions} | 
+                <strong>Available Positions:</strong> ${job.availablePositions}
+              </p>
+            `;
+            
+            // Insert before job description
+            const jobDescSection = document.getElementById('jobDescription').parentElement;
+            jobDescSection.parentNode.insertBefore(availabilityInfo, jobDescSection);
+          }
+        }
+
+        // Apply button visibility
+        const user = getUser();
+        const applyBtn = document.getElementById('applyBtn');
+        if (!user || user.role !== 'jobseeker' || job.hasLimitedAccess) {
+          applyBtn.style.display = 'none';
+        } else {
+          applyBtn.style.display = 'block';
+        }
+
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        showAlert('Failed to load job details: ' + error.message, 'error');
+      }
+    }
+
+    async function applyToJob() {
+      if (!isLoggedIn()) {
+        showAlert('Please login to apply', 'error');
+        setTimeout(() => window.location.href = 'login.html', 2000);
+        return;
+      }
+
+      const user = getUser();
+      if (user.role !== 'jobseeker') {
+        showAlert('Only job seekers can apply', 'error');
+        return;
+      }
+
+      try {
+        const data = await apiRequest('/applications', {
+          method: 'POST',
+          body: JSON.stringify({ jobId: currentJobId }),
+        });
+
+        showAlert(data.message, 'success');
+        document.getElementById('applyBtn').disabled = true;
+        document.getElementById('applyBtn').textContent = 'Applied ✓';
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadJobDetails();
+    });
+  </script>
+</body>
+</html>

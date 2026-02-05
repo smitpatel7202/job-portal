@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks"></div>
+    </div>
+  </nav>
+
+  <section class="dashboard">
+    <div class="container">
+      <div class="dashboard-header">
+        <div>
+          <h2>👤 My Profile</h2>
+          <p>Complete your profile to increase your chances</p>
+        </div>
+        <div class="profile-completion">
+          <div class="completion-circle">
+            <svg width="100" height="100">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#e0e0e0" stroke-width="8"/>
+              <circle id="progressCircle" cx="50" cy="50" r="40" fill="none" stroke="#3498db" 
+                      stroke-width="8" stroke-dasharray="251" stroke-dashoffset="251" 
+                      transform="rotate(-90 50 50)"/>
+              <text id="progressText" x="50" y="55" text-anchor="middle" font-size="20" font-weight="bold" fill="#2c3e50">0%</text>
+            </svg>
+          </div>
+          <p style="text-align: center; margin-top: 10px;">Profile Complete</p>
+        </div>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <!-- Job Seeker Profile -->
+      <div id="jobseekerProfile" style="display: none;">
+        <!-- Basic Info -->
+        <div class="dashboard-section">
+          <h3>📝 Basic Information</h3>
+          <form onsubmit="updateProfile(event)">
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" id="name" required>
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="email" disabled>
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input type="tel" id="phone" placeholder="+1234567890">
+            </div>
+            <div class="form-group">
+              <label>Location</label>
+              <input type="text" id="location" placeholder="City, Country">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Basic Info</button>
+          </form>
+        </div>
+
+        <!-- Resume Upload -->
+        <div class="dashboard-section">
+          <h3>📄 Resume</h3>
+          <div id="resumeSection">
+            <p>No resume uploaded yet</p>
+          </div>
+          <form onsubmit="uploadResume(event)">
+            <div class="form-group">
+              <input type="file" id="resumeFile" accept=".pdf" required>
+              <small>PDF only, max 5MB</small>
+            </div>
+            <button type="submit" class="btn btn-success">Upload Resume</button>
+          </form>
+        </div>
+
+        <!-- Skills -->
+        <div class="dashboard-section">
+          <h3>💡 Skills</h3>
+          <div id="skillsList" class="skills-container"></div>
+          <form onsubmit="addSkill(event)">
+            <div class="form-group">
+              <input type="text" id="skillInput" placeholder="e.g., JavaScript, React, Node.js">
+            </div>
+            <button type="submit" class="btn btn-primary btn-small">Add Skill</button>
+          </form>
+        </div>
+
+        <!-- Experience -->
+        <div class="dashboard-section">
+          <h3>💼 Work Experience</h3>
+          <div id="experienceList"></div>
+          <button class="btn btn-primary" onclick="showExperienceForm()">Add Experience</button>
+          <div id="experienceForm" style="display: none; margin-top: 1rem;">
+            <form onsubmit="addExperience(event)">
+              <div class="form-group">
+                <label>Job Title</label>
+                <input type="text" id="expTitle" required>
+              </div>
+              <div class="form-group">
+                <label>Company</label>
+                <input type="text" id="expCompany" required>
+              </div>
+              <div class="form-group">
+                <label>Start Date</label>
+                <input type="month" id="expStart" required>
+              </div>
+              <div class="form-group">
+                <label>End Date</label>
+                <input type="month" id="expEnd">
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" id="expCurrent"> Currently working here
+                </label>
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <textarea id="expDesc" rows="4"></textarea>
+              </div>
+              <button type="submit" class="btn btn-success">Save Experience</button>
+              <button type="button" class="btn btn-secondary" onclick="hideExperienceForm()">Cancel</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Education -->
+        <div class="dashboard-section">
+          <h3>🎓 Education</h3>
+          <div id="educationList"></div>
+          <button class="btn btn-primary" onclick="showEducationForm()">Add Education</button>
+          <div id="educationForm" style="display: none; margin-top: 1rem;">
+            <form onsubmit="addEducation(event)">
+              <div class="form-group">
+                <label>Degree</label>
+                <input type="text" id="eduDegree" placeholder="e.g., Bachelor of Science" required>
+              </div>
+              <div class="form-group">
+                <label>Institution</label>
+                <input type="text" id="eduInstitution" required>
+              </div>
+              <div class="form-group">
+                <label>Start Date</label>
+                <input type="month" id="eduStart" required>
+              </div>
+              <div class="form-group">
+                <label>End Date</label>
+                <input type="month" id="eduEnd">
+              </div>
+              <div class="form-group">
+                <label>Grade/CGPA</label>
+                <input type="text" id="eduGrade" placeholder="e.g., 3.8 GPA">
+              </div>
+              <button type="submit" class="btn btn-success">Save Education</button>
+              <button type="button" class="btn btn-secondary" onclick="hideEducationForm()">Cancel</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employer Profile -->
+      <div id="employerProfile" style="display: none;">
+        <div class="dashboard-section">
+          <h3>🏢 Company Information</h3>
+          <form onsubmit="updateProfile(event)">
+            <div class="form-group">
+              <label>Company Name</label>
+              <input type="text" id="companyName" required>
+            </div>
+            <div class="form-group">
+              <label>Company Website</label>
+              <input type="url" id="companyWebsite" placeholder="https://example.com">
+            </div>
+            <div class="form-group">
+              <label>Industry</label>
+              <select id="industry">
+                <option value="">Select Industry</option>
+                <option value="Technology">Technology</option>
+                <option value="Finance">Finance</option>
+                <option value="Healthcare">Healthcare</option>
+                <option value="Education">Education</option>
+                <option value="Retail">Retail</option>
+                <option value="Manufacturing">Manufacturing</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Company Size</label>
+              <select id="companySize">
+                <option value="">Select Size</option>
+                <option value="1-10">1-10 employees</option>
+                <option value="11-50">11-50 employees</option>
+                <option value="51-200">51-200 employees</option>
+                <option value="201-500">201-500 employees</option>
+                <option value="501+">501+ employees</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Company Description</label>
+              <textarea id="companyDescription" rows="5" placeholder="Tell us about your company..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>GST Number (Optional - Not Required)</label>
+              <input type="text" id="gstNumber" placeholder="For verification (optional)">
+            </div>
+            <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem;">
+              <strong>Note:</strong> To post jobs, you need to complete: Company Name, Website, Industry, Company Size, and Company Description. Logo and GST are optional.
+            </p>
+            <button type="submit" class="btn btn-primary">Save Company Info</button>
+          </form>
+        </div>
+
+        <!-- Company Logo -->
+        <div class="dashboard-section">
+          <h3>🖼️ Company Logo</h3>
+          <div id="logoSection">
+            <p>No logo uploaded yet</p>
+          </div>
+          <form onsubmit="uploadLogo(event)">
+            <div class="form-group">
+              <input type="file" id="logoFile" accept="image/*">
+              <small>PNG, JPG or GIF, max 5MB (Optional)</small>
+            </div>
+            <button type="submit" class="btn btn-success">Upload Logo</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+  <script>
+    if (!protectRoute()) throw new Error('Access denied');
+
+    let currentUser = null;
+    let currentSkills = [];
+    let currentExperience = [];
+    let currentEducation = [];
+
+    async function loadProfile() {
+      try {
+        const data = await apiRequest('/profile');
+        currentUser = data;
+
+        // Update progress circle
+        updateProgress(data.profileCompletion || 20);
+
+        // Show relevant profile section
+        if (data.role === 'jobseeker') {
+          document.getElementById('jobseekerProfile').style.display = 'block';
+          loadJobseekerProfile(data);
+        } else if (data.role === 'employer') {
+          document.getElementById('employerProfile').style.display = 'block';
+          loadEmployerProfile(data);
+        }
+      } catch (error) {
+        showAlert('Failed to load profile: ' + error.message, 'error');
+      }
+    }
+
+    function loadJobseekerProfile(data) {
+      document.getElementById('name').value = data.name || '';
+      document.getElementById('email').value = data.email || '';
+      document.getElementById('phone').value = data.phone || '';
+      document.getElementById('location').value = data.location || '';
+
+      // Resume
+      if (data.resume) {
+        const token = getToken();
+        const resumeUrl = data.resume.startsWith('http') ? data.resume : `http://localhost:5000${data.resume}`;
+        const resumeWithToken = token ? `${resumeUrl}${resumeUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : resumeUrl;
+        const isPdf = data.resume.toLowerCase().endsWith('.pdf');
+        document.getElementById('resumeSection').innerHTML = `
+          <p>✅ Resume uploaded</p>
+          <a href="${resumeWithToken}" target="_blank" class="btn btn-small btn-primary">View Resume</a>
+          ${isPdf ? '' : '<p style="color: #7f8c8d; margin-top: 0.5rem;">Preview not available for this file type</p>'}
+        `;
+      }
+
+      // Skills
+      currentSkills = data.skills || [];
+      renderSkills();
+
+      // Experience
+      currentExperience = data.experience || [];
+      renderExperience();
+
+      // Education
+      currentEducation = data.education || [];
+      renderEducation();
+    }
+
+    function loadEmployerProfile(data) {
+      document.getElementById('companyName').value = data.companyName || '';
+      document.getElementById('companyWebsite').value = data.companyWebsite || '';
+      document.getElementById('industry').value = data.industry || '';
+      document.getElementById('companySize').value = data.companySize || '';
+      document.getElementById('companyDescription').value = data.companyDescription || '';
+      document.getElementById('gstNumber').value = data.gstNumber || '';
+
+      // Logo
+      if (data.companyLogo) {
+        document.getElementById('logoSection').innerHTML = `
+          <img src="${data.companyLogo}" alt="Company Logo" style="max-width: 200px; border-radius: 10px;">
+        `;
+      }
+    }
+
+    function updateProgress(percentage) {
+      const circle = document.getElementById('progressCircle');
+      const text = document.getElementById('progressText');
+      const circumference = 251;
+      const offset = circumference - (percentage / 100) * circumference;
+      circle.style.strokeDashoffset = offset;
+      text.textContent = percentage + '%';
+    }
+
+    async function updateProfile(event) {
+      event.preventDefault();
+      
+      const profileData = {};
+      
+      if (currentUser.role === 'jobseeker') {
+        profileData.name = document.getElementById('name').value;
+        profileData.phone = document.getElementById('phone').value;
+        profileData.location = document.getElementById('location').value;
+        profileData.skills = currentSkills;
+        profileData.experience = currentExperience;
+        profileData.education = currentEducation;
+      } else {
+        profileData.companyName = document.getElementById('companyName').value;
+        profileData.companyWebsite = document.getElementById('companyWebsite').value;
+        profileData.industry = document.getElementById('industry').value;
+        profileData.companySize = document.getElementById('companySize').value;
+        profileData.companyDescription = document.getElementById('companyDescription').value;
+        profileData.gstNumber = document.getElementById('gstNumber').value;
+      }
+
+      try {
+        const data = await apiRequest('/profile', {
+          method: 'PUT',
+          body: JSON.stringify(profileData)
+        });
+        
+        if (data.requiresAdminReview) {
+          showAlert('Profile completed! Your profile is now pending admin review. You can post jobs after approval.', 'success');
+        } else {
+          showAlert('Profile updated successfully!', 'success');
+        }
+        updateProgress(data.user.profileCompletion);
+      } catch (error) {
+        showAlert('Failed to update profile: ' + error.message, 'error');
+      }
+    }
+
+    async function uploadResume(event) {
+      event.preventDefault();
+      const file = document.getElementById('resumeFile').files[0];
+      
+      if (!file) {
+        showAlert('Please select a file', 'error');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('resume', file);
+
+      try {
+        const response = await fetch('http://localhost:5000/api/profile/resume', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          },
+          body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+
+        showAlert('Resume uploaded successfully!', 'success');
+        loadProfile();
+      } catch (error) {
+        showAlert('Failed to upload resume: ' + error.message, 'error');
+      }
+    }
+
+    async function uploadLogo(event) {
+      event.preventDefault();
+      const file = document.getElementById('logoFile').files[0];
+      
+      if (!file) {
+        showAlert('Please select a file', 'error');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      try {
+        const response = await fetch('http://localhost:5000/api/profile/logo', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${getToken()}`
+          },
+          body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+
+        showAlert('Logo uploaded successfully!', 'success');
+        loadProfile();
+      } catch (error) {
+        showAlert('Failed to upload logo: ' + error.message, 'error');
+      }
+    }
+
+    function addSkill(event) {
+      event.preventDefault();
+      const skillInput = document.getElementById('skillInput');
+      const skill = skillInput.value.trim();
+      
+      if (skill && !currentSkills.includes(skill)) {
+        currentSkills.push(skill);
+        renderSkills();
+        skillInput.value = '';
+        updateProfile(new Event('submit'));
+      }
+    }
+
+    function removeSkill(skill) {
+      currentSkills = currentSkills.filter(s => s !== skill);
+      renderSkills();
+      updateProfile(new Event('submit'));
+    }
+
+    function renderSkills() {
+      const container = document.getElementById('skillsList');
+      if (currentSkills.length === 0) {
+        container.innerHTML = '<p style="color: #7f8c8d;">No skills added yet</p>';
+        return;
+      }
+      container.innerHTML = currentSkills.map(skill => `
+        <span class="skill-tag">
+          ${skill} 
+          <span onclick="removeSkill('${skill}')" style="cursor: pointer; margin-left: 8px;">×</span>
+        </span>
+      `).join('');
+    }
+
+    function showExperienceForm() {
+      document.getElementById('experienceForm').style.display = 'block';
+    }
+
+    function hideExperienceForm() {
+      document.getElementById('experienceForm').style.display = 'none';
+    }
+
+    function addExperience(event) {
+      event.preventDefault();
+      const exp = {
+        title: document.getElementById('expTitle').value,
+        company: document.getElementById('expCompany').value,
+        startDate: document.getElementById('expStart').value,
+        endDate: document.getElementById('expEnd').value,
+        current: document.getElementById('expCurrent').checked,
+        description: document.getElementById('expDesc').value
+      };
+      
+      currentExperience.push(exp);
+      renderExperience();
+      hideExperienceForm();
+      updateProfile(new Event('submit'));
+    }
+
+    function renderExperience() {
+      const container = document.getElementById('experienceList');
+      if (currentExperience.length === 0) {
+        container.innerHTML = '<p style="color: #7f8c8d;">No experience added yet</p>';
+        return;
+      }
+      container.innerHTML = currentExperience.map((exp, i) => `
+        <div class="experience-card">
+          <h4>${exp.title}</h4>
+          <p><strong>${exp.company}</strong></p>
+          <p style="color: #7f8c8d; font-size: 0.9rem;">
+            ${new Date(exp.startDate).toLocaleDateString()} - 
+            ${exp.current ? 'Present' : new Date(exp.endDate).toLocaleDateString()}
+          </p>
+          <p>${exp.description || ''}</p>
+        </div>
+      `).join('');
+    }
+
+    function showEducationForm() {
+      document.getElementById('educationForm').style.display = 'block';
+    }
+
+    function hideEducationForm() {
+      document.getElementById('educationForm').style.display = 'none';
+    }
+
+    function addEducation(event) {
+      event.preventDefault();
+      const edu = {
+        degree: document.getElementById('eduDegree').value,
+        institution: document.getElementById('eduInstitution').value,
+        startDate: document.getElementById('eduStart').value,
+        endDate: document.getElementById('eduEnd').value,
+        grade: document.getElementById('eduGrade').value
+      };
+      
+      currentEducation.push(edu);
+      renderEducation();
+      hideEducationForm();
+      updateProfile(new Event('submit'));
+    }
+
+    function renderEducation() {
+      const container = document.getElementById('educationList');
+      if (currentEducation.length === 0) {
+        container.innerHTML = '<p style="color: #7f8c8d;">No education added yet</p>';
+        return;
+      }
+      container.innerHTML = currentEducation.map(edu => `
+        <div class="experience-card">
+          <h4>${edu.degree}</h4>
+          <p><strong>${edu.institution}</strong></p>
+          <p style="color: #7f8c8d; font-size: 0.9rem;">
+            ${new Date(edu.startDate).toLocaleDateString()} - 
+            ${new Date(edu.endDate).toLocaleDateString()}
+          </p>
+          ${edu.grade ? `<p>Grade: ${edu.grade}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadProfile);
+  </script>
+
+  <style>
+    .profile-completion {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .skills-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 1rem;
+    }
+
+    .skill-tag {
+      background: #3498db;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .experience-card {
+      background: #f8f9fa;
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border-left: 4px solid #3498db;
+    }
+
+    .experience-card h4 {
+      color: #2c3e50;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Post a Job - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks">
+        <a href="jobs.html">Browse Jobs</a>
+        <a href="employer-dashboard.html">Dashboard</a>
+        <a href="profile.html">Profile</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <section class="dashboard">
+    <div class="container">
+      <div class="dashboard-header">
+        <h2>📝 Post a New Job</h2>
+        <p>Fill in the details to post your job opening</p>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+
+
+      <!-- Profile Completion Warning -->
+      <div id="profileWarning" class="dashboard-section" style="background: #fff3cd; border-left: 4px solid #ffc107; display: none;">
+        <h3>⚠️ Profile Incomplete</h3>
+        <p>Please complete your profile (100%) before posting jobs.</p>
+        <p>Current completion: <strong id="profileCompletionText">0%</strong></p>
+        <a href="profile.html" class="btn btn-primary">Complete Profile</a>
+      </div>
+
+      <!-- Profile Pending Review Warning -->
+      <div id="reviewWarning" class="dashboard-section" style="background: #d1ecf1; border-left: 4px solid #17a2b8; display: none;">
+        <h3>⏳ Profile Under Review</h3>
+        <p>Your profile is complete and pending admin review. You can post jobs after admin approval.</p>
+      </div>
+
+      <!-- Post Job Form -->
+      <div id="jobForm" class="dashboard-section" style="display: none;">
+        <form onsubmit="postJob(event)">
+          <div class="form-group">
+            <label for="title">Job Title *</label>
+            <input type="text" id="title" placeholder="e.g. Senior Software Engineer" required>
+          </div>
+
+          <div class="form-group">
+            <label for="company">Company Name *</label>
+            <input type="text" id="company" placeholder="e.g. Tech Corp" required>
+          </div>
+
+          <div class="form-group">
+            <label for="category">Job Category *</label>
+            <select id="category" required>
+              <option value="">Select Category</option>
+              <option value="Technology">Technology</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Sales">Sales</option>
+              <option value="Finance">Finance</option>
+              <option value="HR">Human Resources</option>
+              <option value="Design">Design</option>
+              <option value="Customer Service">Customer Service</option>
+              <option value="Operations">Operations</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="location">Location *</label>
+            <input type="text" id="location" placeholder="e.g. New York, NY" required>
+          </div>
+
+          <div class="form-group">
+            <label for="workMode">Work Mode *</label>
+            <select id="workMode" required>
+              <option value="On-site">On-site</option>
+              <option value="Remote">Remote</option>
+              <option value="Hybrid">Hybrid</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="type">Job Type *</label>
+            <select id="type" required>
+              <option value="Full-time">Full-time</option>
+              <option value="Part-time">Part-time</option>
+              <option value="Internship">Internship</option>
+              <option value="Contract">Contract</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="experienceLevel">Experience Level *</label>
+            <select id="experienceLevel" required>
+              <option value="Entry">Entry Level</option>
+              <option value="Mid">Mid Level</option>
+              <option value="Senior">Senior Level</option>
+              <option value="Lead">Lead/Manager</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="openings">Number of Openings</label>
+            <input type="number" id="openings" min="1" value="1" placeholder="1">
+          </div>
+
+          <div class="form-group">
+            <label for="salary">Salary Range</label>
+            <input type="text" id="salary" placeholder="e.g. $80,000 - $120,000">
+          </div>
+
+          <div class="form-group">
+            <label for="requiredSkills">Required Skills (comma-separated)</label>
+            <input type="text" id="requiredSkills" placeholder="e.g. JavaScript, React, Node.js">
+          </div>
+
+          <div class="form-group">
+            <label for="applicationDeadline">Application Deadline</label>
+            <input type="date" id="applicationDeadline" min="<?php echo date('Y-m-d'); ?>">
+          </div>
+
+          <div class="form-group">
+            <label for="description">Job Description *</label>
+            <textarea id="description" rows="8" placeholder="Describe the role, requirements, responsibilities, and what makes your company great..." required></textarea>
+          </div>
+
+          <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem;">
+            ℹ️ Your job will be reviewed by admin before going live
+          </p>
+
+          <button type="submit" class="btn btn-success">Submit Job for Review</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+  <script>
+    // Protect route - only employers allowed
+    if (!protectRoute(['employer'])) {
+      throw new Error('Access denied');
+    }
+
+    let employerProfile = null;
+
+    // Load employer profile and prefill form
+    async function loadEmployerProfile() {
+      try {
+        const profile = await apiRequest('/profile');
+        employerProfile = profile;
+
+        // Check profile completion
+        const completion = profile.profileCompletion || 0;
+        const isVerified = profile.isVerified;
+
+        if (completion < 100) {
+          document.getElementById('profileWarning').style.display = 'block';
+          document.getElementById('profileCompletionText').textContent = completion + '%';
+          document.getElementById('jobForm').style.display = 'none';
+          return;
+        }
+
+        if (!isVerified) {
+          document.getElementById('reviewWarning').style.display = 'block';
+          document.getElementById('jobForm').style.display = 'none';
+
+          // Provide clear next step for the employer: request verification
+          const reviewEl = document.getElementById('reviewWarning');
+          reviewEl.innerHTML = `
+            <h3>⏳ Profile Under Review</h3>
+            <p>Your profile is complete and pending admin review. You can post jobs after admin approval.</p>
+            <p>If you'd like to request verification now, click the button below to notify admins.</p>
+            <div style="margin-top:8px; display:flex; gap:8px;">
+              <button class="btn btn-primary" onclick="requestVerification()">Request Verification</button>
+              <a href="mailto:support@jobportal.local" class="btn btn-secondary">Contact Support</a>
+            </div>
+            <p style="margin-top:8px; color:#7f8c8d; font-size:0.9rem;">Note: admins may still review manually.</p>
+          `;
+          return;
+        }
+
+        // Show form and prefill
+        document.getElementById('jobForm').style.display = 'block';
+        prefillJobForm(profile);
+      } catch (error) {
+        showAlert('Failed to load profile: ' + error.message, 'error');
+        // Try raw fetch to surface the server response for debugging
+        try {
+          const rawResponse = await fetch((typeof API_URL !== 'undefined' ? API_URL : 'http://localhost:5000') + '/profile', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+          });
+          const text = await rawResponse.text();
+          document.getElementById('debugRaw').textContent = `Status: ${rawResponse.status}\n\n${text}`;
+          document.getElementById('debugPanel').style.display = 'block';
+        } catch (e) {
+          document.getElementById('debugRaw').textContent = 'Raw fetch failed: ' + e.message;
+          document.getElementById('debugPanel').style.display = 'block';
+        }
+      }
+    }
+
+    // Prefill job form with employer profile data
+    function prefillJobForm(profile) {
+      if (profile.companyName) {
+        document.getElementById('company').value = profile.companyName;
+      }
+      // You can add more prefilled fields here if needed
+    }
+
+    // Post new job
+    async function postJob(event) {
+      event.preventDefault();
+
+      const requiredSkillsInput = document.getElementById('requiredSkills').value;
+      const requiredSkills = requiredSkillsInput ? requiredSkillsInput.split(',').map(s => s.trim()).filter(s => s) : [];
+
+      const jobData = {
+        title: document.getElementById('title').value,
+        company: document.getElementById('company').value,
+        location: document.getElementById('location').value,
+        type: document.getElementById('type').value,
+        category: document.getElementById('category').value,
+        salary: document.getElementById('salary').value,
+        description: document.getElementById('description').value,
+        workMode: document.getElementById('workMode').value,
+        experienceLevel: document.getElementById('experienceLevel').value,
+        openings: parseInt(document.getElementById('openings').value) || 1,
+        requiredSkills: requiredSkills,
+        applicationDeadline: document.getElementById('applicationDeadline').value || null
+      };
+
+      try {
+        const data = await apiRequest('/jobs', {
+          method: 'POST',
+          body: JSON.stringify(jobData),
+        });
+
+        showAlert(data.message || 'Job posted successfully!', 'success');
+        event.target.reset();
+        prefillJobForm(employerProfile); // Re-prefill after reset
+        setTimeout(() => {
+          window.location.href = 'employer-dashboard.html';
+        }, 2000);
+      } catch (error) {
+        if (error.message.includes('profile')) {
+          document.getElementById('profileWarning').style.display = 'block';
+          document.getElementById('jobForm').style.display = 'none';
+        } else if (error.message.includes('review')) {
+          document.getElementById('reviewWarning').style.display = 'block';
+          document.getElementById('jobForm').style.display = 'none';
+        }
+        showAlert('Failed to post job: ' + error.message, 'error');
+      }
+    }
+
+    // Request verification (notify admins)
+    async function requestVerification() {
+      try {
+        const data = await apiRequest('/employer/request-verification', { method: 'POST' });
+        showAlert(data.message || 'Verification request sent', 'success');
+      } catch (error) {
+        showAlert('Failed to request verification: ' + error.message, 'error');
+      }
+    }
+
+    // Load profile on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadEmployerProfile();
+    });
+  </script>
+</body>
+</html>

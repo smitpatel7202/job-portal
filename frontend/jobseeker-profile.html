@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Seeker Profile - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks"></div>
+    </div>
+  </nav>
+
+  <section class="dashboard">
+    <div class="container">
+      <div id="alert" class="alert"></div>
+
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading profile...</p>
+      </div>
+
+      <div id="profileContent" style="display: none;">
+        <!-- Profile Header -->
+        <div class="dashboard-section"
+          style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 10px; margin-bottom: 2rem;">
+          <div style="display: flex; gap: 2rem; align-items: center;">
+            <div id="profilePic"
+              style="width: 120px; height: 120px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+              👤
+            </div>
+            <div>
+              <h1 id="profileName" style="margin-bottom: 0.5rem; color: white;"></h1>
+              <p id="profileEmail" style="color: rgba(255,255,255,0.9); margin-bottom: 0.5rem;"></p>
+              <p id="profileLocation" style="color: rgba(255,255,255,0.9);"></p>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+          <!-- Main Content -->
+          <div>
+            <!-- About -->
+            <div class="dashboard-section">
+              <h3>👤 About</h3>
+              <div id="aboutSection">
+                <p id="profilePhone" style="margin-bottom: 0.5rem;"></p>
+                <p id="profileLocationDetail" style="margin-bottom: 0.5rem;"></p>
+                <p id="expectedSalary" style="margin-bottom: 0.5rem;"></p>
+                <p id="preferredLocations" style="margin-bottom: 0.5rem;"></p>
+              </div>
+            </div>
+
+            <!-- Skills -->
+            <div class="dashboard-section">
+              <h3>💡 Skills</h3>
+              <div id="skillsSection" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem;">
+                <p style="color: #7f8c8d;">No skills added yet</p>
+              </div>
+            </div>
+
+            <!-- Experience -->
+            <div class="dashboard-section">
+              <h3>💼 Work Experience</h3>
+              <div id="experienceSection" style="margin-top: 1rem;">
+                <p style="color: #7f8c8d;">No experience added yet</p>
+              </div>
+            </div>
+
+            <!-- Education -->
+            <div class="dashboard-section">
+              <h3>🎓 Education</h3>
+              <div id="educationSection" style="margin-top: 1rem;">
+                <p style="color: #7f8c8d;">No education added yet</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sidebar -->
+          <div>
+            <!-- Resume -->
+            <div class="dashboard-section">
+              <h3>📄 Resume</h3>
+              <div id="resumeSection">
+                <p style="color: #7f8c8d;">No resume uploaded</p>
+              </div>
+            </div>
+
+            <!-- Profile Completion -->
+            <div class="dashboard-section">
+              <h3>📊 Profile Completion</h3>
+              <div style="text-align: center;">
+                <div style="width: 150px; height: 150px; margin: 0 auto; position: relative;">
+                  <svg width="150" height="150">
+                    <circle cx="75" cy="75" r="70" fill="none" stroke="#e0e0e0" stroke-width="10" />
+                    <circle id="progressCircle" cx="75" cy="75" r="70" fill="none" stroke="#3498db" stroke-width="10"
+                      stroke-dasharray="440" stroke-dashoffset="440" transform="rotate(-90 75 75)"
+                      stroke-linecap="round" />
+                    <text id="progressText" x="75" y="85" text-anchor="middle" font-size="24" font-weight="bold"
+                      fill="#2c3e50">0%</text>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+  <script>
+    async function loadJobSeekerProfile() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get('id');
+
+      if (!userId) {
+        showAlert('User ID not provided', 'error');
+        return;
+      }
+
+      try {
+        const user = await apiRequest(`/users/${userId}/profile`);
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('profileContent').style.display = 'block';
+
+        // Populate profile
+        document.getElementById('profileName').textContent = user.name;
+        document.getElementById('profileEmail').textContent = `📧 ${user.email}`;
+        if (user.location) {
+          document.getElementById('profileLocation').textContent = `📍 ${user.location}`;
+          document.getElementById('profileLocationDetail').innerHTML = `<strong>Location:</strong> ${user.location}`;
+        }
+        if (user.phone) {
+          document.getElementById('profilePhone').innerHTML = `<strong>Phone:</strong> ${user.phone}`;
+        }
+        if (user.expectedSalary) {
+          document.getElementById('expectedSalary').innerHTML = `<strong>Expected Salary:</strong> ${user.expectedSalary}`;
+        }
+        if (user.preferredLocation && user.preferredLocation.length > 0) {
+          document.getElementById('preferredLocations').innerHTML =
+            `<strong>Preferred Locations:</strong> ${user.preferredLocation.join(', ')}`;
+        }
+
+        // Skills
+        if (user.skills && user.skills.length > 0) {
+          document.getElementById('skillsSection').innerHTML = user.skills.map(skill =>
+            `<span style="background: #3498db; color: white; padding: 8px 15px; border-radius: 20px;">${skill}</span>`
+          ).join('');
+        }
+
+        // Experience
+        if (user.experience && user.experience.length > 0) {
+          document.getElementById('experienceSection').innerHTML = user.experience.map(exp => `
+            <div style="border-left: 4px solid #3498db; padding-left: 1rem; margin-bottom: 1.5rem;">
+              <h4 style="margin-bottom: 0.5rem;">${exp.title}</h4>
+              <p style="font-weight: bold; color: #2c3e50; margin-bottom: 0.5rem;">${exp.company}</p>
+              <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                ${new Date(exp.startDate).toLocaleDateString()} - 
+                ${exp.current ? 'Present' : new Date(exp.endDate).toLocaleDateString()}
+              </p>
+              ${exp.description ? `<p style="margin-top: 0.5rem;">${exp.description}</p>` : ''}
+            </div>
+          `).join('');
+        }
+
+        // Education
+        if (user.education && user.education.length > 0) {
+          document.getElementById('educationSection').innerHTML = user.education.map(edu => `
+            <div style="border-left: 4px solid #27ae60; padding-left: 1rem; margin-bottom: 1.5rem;">
+              <h4 style="margin-bottom: 0.5rem;">${edu.degree}</h4>
+              <p style="font-weight: bold; color: #2c3e50; margin-bottom: 0.5rem;">${edu.institution}</p>
+              <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                ${new Date(edu.startDate).toLocaleDateString()} - ${new Date(edu.endDate).toLocaleDateString()}
+              </p>
+              ${edu.grade ? `<p style="margin-top: 0.5rem;"><strong>Grade:</strong> ${edu.grade}</p>` : ''}
+            </div>
+          `).join('');
+        }
+
+        // Resume - use secure API endpoint so auth can be passed via token param
+        if (user.resume) {
+          const token = getToken();
+          const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+          const resumeUrl = `${API_URL.replace('/api', '')}/api/resume/${user._id}${tokenParam}`;
+          const isPdf = user.resume.toLowerCase().endsWith('.pdf');
+          document.getElementById('resumeSection').innerHTML =
+            `<a href="${resumeUrl}" target="_blank" class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;">📄 Download Resume (PDF)</a>
+             ${isPdf ? `
+               <div style="border: 1px solid #ddd; border-radius: 5px; overflow: hidden;">
+                 <iframe src="${resumeUrl}#toolbar=0" style="width: 100%; height: 600px; border: none;" frameborder="0"></iframe>
+               </div>
+             ` : '<p style="color: #7f8c8d;">Preview not available for this file type</p>'}`;
+        } else {
+          document.getElementById('resumeSection').innerHTML =
+            '<p style="color: #7f8c8d;">No resume uploaded</p>';
+        }
+
+        // Profile completion
+        const completion = user.profileCompletion || 0;
+        const circle = document.getElementById('progressCircle');
+        const text = document.getElementById('progressText');
+        const circumference = 440;
+        const offset = circumference - (completion / 100) * circumference;
+        circle.style.strokeDashoffset = offset;
+        text.textContent = completion + '%';
+
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        showAlert('Failed to load profile: ' + error.message, 'error');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadJobSeekerProfile();
+    });
+  </script>
+</body>
+
+</html>

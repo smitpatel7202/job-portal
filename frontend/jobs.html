@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browse Jobs - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks">
+        <a href="index.html">Home</a>
+        <a href="jobs.html">Jobs</a>
+        <a href="login.html">Login</a>
+        <a href="register.html">Register</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Jobs Section -->
+  <section class="jobs-section">
+    <div class="container">
+      <div class="jobs-header">
+        <h2>🔍 Browse All Jobs</h2>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <!-- Loading State -->
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading jobs...</p>
+      </div>
+
+      <!-- Jobs Grid -->
+      <div id="jobsGrid" class="jobs-grid"></div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="empty-state" style="display: none;">
+        <h3>No Jobs Found</h3>
+        <p>Check back later for new opportunities!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+      <p><a href="terms.html">Terms & Conditions</a> | <a href="privacy.html">Privacy Policy</a> | <a href="disclaimer.html">Disclaimer</a></p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+  <script>
+    // Fetch and display all jobs
+    async function loadJobs() {
+      const loading = document.getElementById('loading');
+      const jobsGrid = document.getElementById('jobsGrid');
+      const emptyState = document.getElementById('emptyState');
+
+      try {
+        const data = await apiRequest('/jobs');
+        
+        loading.style.display = 'none';
+
+        if (data.length === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+
+        jobsGrid.innerHTML = data.map(job => `
+          <div class="job-card">
+            <div class="job-header">
+              <div>
+                <h3 class="job-title" style="cursor: pointer;" onclick="viewJobDetails('${job._id}')">${job.title}</h3>
+                <span class="job-type">${job.type}</span>
+              </div>
+            </div>
+            <p class="job-company">
+              🏢 ${job.company}
+              ${job.postedBy && job.postedBy.isVerified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+            </p>
+            <p class="job-location">📍 ${job.location}</p>
+            <p class="job-description">${job.description.substring(0, 150)}...</p>
+            <div class="job-footer">
+              <span class="job-salary">${job.salary || 'Salary not disclosed'}</span>
+              <div>
+                <button class="btn btn-info btn-small" onclick="viewJobDetails('${job._id}')" style="margin-right: 5px;">
+                  View Details
+                </button>
+                ${isLoggedIn() && getUser() && getUser().role === 'jobseeker' ? `
+                  <button class="btn btn-primary btn-small" onclick="applyToJob('${job._id}')">
+                    Apply Now
+                  </button>
+                ` : ''}
+                ${isLoggedIn() ? `
+                  <button class="btn btn-secondary btn-small" onclick="reportJob('${job._id}')" style="margin-left: 5px;">
+                    Report
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+      } catch (error) {
+        loading.style.display = 'none';
+        showAlert('Failed to load jobs: ' + error.message, 'error');
+      }
+    }
+
+    // View job details
+    function viewJobDetails(jobId) {
+      window.open(`job-details.html?id=${jobId}`, '_blank');
+    }
+
+    // Apply to job
+    async function applyToJob(jobId) {
+      if (!isLoggedIn()) {
+        showAlert('Please login to apply for jobs', 'error');
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 2000);
+        return;
+      }
+
+      const user = getUser();
+      if (user.role !== 'jobseeker') {
+        showAlert('Only job seekers can apply to jobs', 'error');
+        return;
+      }
+
+      try {
+        const data = await apiRequest('/applications', {
+          method: 'POST',
+          body: JSON.stringify({ jobId }),
+        });
+
+        showAlert(data.message, 'success');
+      } catch (error) {
+        showAlert(error.message, 'error');
+      }
+    }
+
+    // Load jobs on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadJobs();
+    });
+  </script>
+</body>
+</html>

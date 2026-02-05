@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks">
+        <a href="index.html">Home</a>
+        <a href="jobs.html">Jobs</a>
+        <a href="login.html">Login</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Register Form -->
+  <section class="auth-container">
+    <div class="auth-box">
+      <h2>📝 Create Your Account</h2>
+      
+      <div id="alert" class="alert"></div>
+
+      <form onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" placeholder="Enter your full name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" placeholder="Enter your email" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Create a password (min 6 characters)" required minlength="6">
+        </div>
+
+        <div class="form-group">
+          <label for="role">Register As</label>
+          <select id="role" required>
+            <option value="jobseeker">Job Seeker</option>
+            <option value="employer">Employer</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary form-btn">Register</button>
+      </form>
+
+      <p class="auth-link">
+        Already have an account? <a href="login.html">Login here</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+</body>
+</html>

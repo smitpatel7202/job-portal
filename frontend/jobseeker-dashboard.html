@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Applications - Job Portal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <h2>💼 JobPortal</h2>
+      </div>
+      <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+      <div class="nav-links" id="navLinks">
+        <a href="jobs.html">Browse Jobs</a>
+        <a href="profile.html">My Profile</a>
+        <a href="jobseeker-dashboard.html">My Applications</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <section class="dashboard">
+    <div class="container">
+      <div class="dashboard-header">
+        <h2>📋 My Applications</h2>
+        <p>Track your job applications and their status</p>
+      </div>
+
+      <div id="alert" class="alert"></div>
+
+      <!-- Application Stats -->
+      <div class="dashboard-stats">
+        <div class="stat-card">
+          <h3 id="totalApps">0</h3>
+          <p>Total Applications</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="pendingApps">0</h3>
+          <p>Pending</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="shortlistedApps">0</h3>
+          <p>⭐ Shortlisted</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="acceptedApps">0</h3>
+          <p>Accepted</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="rejectedApps">0</h3>
+          <p>Rejected</p>
+        </div>
+      </div>
+
+      <!-- Applications List -->
+      <div class="dashboard-section">
+        <h3>📄 Application History</h3>
+        
+        <div id="loadingApps" class="loading">
+          <div class="spinner"></div>
+          <p>Loading your applications...</p>
+        </div>
+
+        <div id="applicationsContainer"></div>
+
+        <div id="emptyApps" class="empty-state" style="display: none;">
+          <h3>No Applications Yet</h3>
+          <p>Start by browsing and applying to jobs!</p>
+          <a href="jobs.html" class="btn btn-primary" style="margin-top: 1rem;">Browse Jobs</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 JobPortal. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="auth.js"></script>
+  <script>
+    // Protect route - only job seekers allowed
+    if (!protectRoute(['jobseeker'])) {
+      throw new Error('Access denied');
+    }
+
+    // Load user's applications
+    async function loadApplications() {
+      const loading = document.getElementById('loadingApps');
+      const container = document.getElementById('applicationsContainer');
+      const emptyApps = document.getElementById('emptyApps');
+
+      try {
+        const data = await apiRequest('/applications/my');
+        
+        loading.style.display = 'none';
+
+        if (data.length === 0) {
+          emptyApps.style.display = 'block';
+          container.innerHTML = '';
+          return;
+        }
+
+        emptyApps.style.display = 'none';
+
+        // Calculate stats
+        const stats = {
+          total: data.length,
+          pending: data.filter(app => app.status === 'pending').length,
+          shortlisted: data.filter(app => app.status === 'shortlisted').length,
+          accepted: data.filter(app => app.status === 'accepted').length,
+          rejected: data.filter(app => app.status === 'rejected').length,
+        };
+
+        document.getElementById('totalApps').textContent = stats.total;
+        document.getElementById('pendingApps').textContent = stats.pending;
+        document.getElementById('shortlistedApps').textContent = stats.shortlisted;
+        document.getElementById('acceptedApps').textContent = stats.accepted;
+        document.getElementById('rejectedApps').textContent = stats.rejected;
+
+        // Display applications
+        container.innerHTML = data.map(app => `
+          <div class="application-card" style="border: 1px solid #ddd; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px; ${app.status === 'shortlisted' ? 'border-left: 4px solid #27ae60; background: #f0f9f4;' : app.status === 'accepted' ? 'border-left: 4px solid #3498db; background: #ebf5fb;' : ''}">
+            <div class="application-info">
+              <h4 style="margin-bottom: 0.5rem;">${app.jobId.title}</h4>
+              <p>🏢 ${app.jobId.company}</p>
+              <p>📍 ${app.jobId.location}</p>
+              <p style="color: #7f8c8d; font-size: 0.85rem;">
+                Applied on ${new Date(app.appliedAt).toLocaleDateString()}
+              </p>
+              ${app.status === 'shortlisted' ? '<p style="color: #27ae60; font-weight: bold; margin-top: 0.5rem;">🎉 Congratulations! You have been shortlisted!</p>' : ''}
+              ${app.status === 'accepted' ? '<p style="color: #3498db; font-weight: bold; margin-top: 0.5rem;">✅ Your application has been accepted!</p>' : ''}
+              ${app.employerNotes ? `<div style="margin-top: 1rem; padding: 1rem; background: #fff3cd; border-radius: 5px;"><strong>📝 Notes from Employer:</strong><br>${app.employerNotes}</div>` : ''}
+              <button class="btn btn-primary btn-small" onclick="viewJobDetails('${app.jobId._id}', '${app.status}')" style="margin-top: 1rem;">View Job Details</button>
+            </div>
+            <div>
+              <span class="status-badge status-${app.status}" style="display: inline-block; padding: 8px 15px; border-radius: 20px; font-weight: bold;">
+                ${app.status === 'shortlisted' ? '⭐ Shortlisted' : app.status === 'accepted' ? '✅ Accepted' : app.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
+              </span>
+            </div>
+          </div>
+        `).join('');
+
+      } catch (error) {
+        loading.style.display = 'none';
+        showAlert('Failed to load applications: ' + error.message, 'error');
+      }
+    }
+
+    // View job details
+    async function viewJobDetails(jobId, status) {
+      // Open job details page with status info
+      const url = `job-details.html?id=${jobId}&status=${status}&from=dashboard`;
+      window.open(url, '_blank');
+    }
+
+    // Load applications on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadApplications();
+    });
+  </script>
+</body>
+</html>
