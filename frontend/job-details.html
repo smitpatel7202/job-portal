@@ -108,6 +108,7 @@
     </div>
   </footer>
 
+  <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
     let currentJobId = null;
@@ -208,7 +209,7 @@
             document.getElementById('companyLogo').innerHTML = 
               `<img src="${window.API_CONFIG ? window.API_CONFIG.BASE_URL : 'http://localhost:5000'}${companyInfo.companyLogo}" alt="Company Logo" style="max-width: 150px; border-radius: 8px;">`;
           }
-          
+
           document.getElementById('companyName').textContent = companyInfo.companyName || job.company;
           if (companyInfo.industry) {
             document.getElementById('companyIndustry').textContent = `Industry: ${companyInfo.industry}`;
