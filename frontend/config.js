@@ -1,8 +1,7 @@
 // CONFIG.JS - Environment Configuration
 // ============================================
-console.log("CONFIG FILE LOADED");
 
-// Development or Production
+// Development or Production 
 const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
 // API URLs
