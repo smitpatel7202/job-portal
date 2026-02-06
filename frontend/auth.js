@@ -3,7 +3,7 @@
 // ============================================
 
 // Load configuration
-const API_URL = window.API_CONFIG ? window.API_CONFIG.API_URL : 'http://localhost:5000/api';
+window.API_URL = window.API_CONFIG ? window.API_CONFIG.API_URL : 'http://localhost:5000/api';
 
 // ============================================
 // UTILITY FUNCTIONS
