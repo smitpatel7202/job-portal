@@ -60,6 +60,8 @@
   <script src="config.js"></script>
   <script src="auth.js"></script>
   <script>
+    let selectedJobForApply = null;
+
     // Fetch and display all jobs
     async function loadJobs() {
       const loading = document.getElementById('loading');
@@ -69,6 +71,38 @@
       try {
         const data = await apiRequest('/jobs');
         
+        // Debug: Log user status
+        console.log('User logged in:', isLoggedIn());
+        console.log('User data:', getUser());
+        console.log('Jobs data received:', data);
+        
+        // Handle case where data is null or not an array
+        if (!data || !Array.isArray(data)) {
+          console.error('Invalid jobs data received:', data);
+          loading.style.display = 'none';
+          emptyState.style.display = 'block';
+          return;
+        }
+        
+        // Get user's applications to check if already applied
+        let userApplications = [];
+        if (isLoggedIn() && getUser() && getUser().role === 'jobseeker') {
+          try {
+            userApplications = await apiRequest('/applications/my');
+            console.log('User applications:', userApplications);
+          } catch (error) {
+            console.error('Failed to load applications:', error);
+          }
+        }
+        
+        const appliedJobIds = new Set(userApplications.map(app => {
+          if (!app || !app.jobId) {
+            console.error('Invalid application object or missing jobId:', app);
+            return null;
+          }
+          return app.jobId._id;
+        }).filter(id => id !== null));
+        
         loading.style.display = 'none';
 
         if (data.length === 0) {
@@ -76,20 +110,49 @@
           return;
         }
 
-        jobsGrid.innerHTML = data.map(job => `
+        jobsGrid.innerHTML = data.map(job => {
+          if (!job || !job._id) {
+            console.error('Invalid job object or missing _id:', job);
+            return ''; // Skip this job or handle appropriately
+          }
+          const hasApplied = appliedJobIds.has(job._id);
+          
+          // Debug: Log job and application status
+          console.log(`Job: ${job.title}, Has Applied: ${hasApplied}`);
+          
+          // Get experience level display with emoji and years
+          const getExperienceDisplay = (level) => {
+            switch(level) {
+              case 'Entry':
+                return '🟢 Entry-Level (0-1 Yrs)';
+              case 'Mid':
+                return '🔵 Mid-Level (1-3 Yrs)';
+              case 'Senior':
+                return '🟡 Experienced (3+ Yrs)';
+              case 'Lead':
+                return '🔴 Lead/Manager';
+              default:
+                return '⚪ Not Specified';
+            }
+          };
+          
+          return `
           <div class="job-card">
             <div class="job-header">
               <div>
-                <h3 class="job-title" style="cursor: pointer;" onclick="viewJobDetails('${job._id}')">${job.title}</h3>
-                <span class="job-type">${job.type}</span>
+                <h3 class="job-title" style="cursor: pointer;" onclick="viewJobDetails('${job._id}')">${job.title || 'Job Title Not Available'}</h3>
+                <span class="job-type">${job.type || 'Not Specified'}</span>
               </div>
             </div>
+            <div class="experience-tag" data-level="${job.experienceLevel}" style="margin: 8px 0; font-weight: bold; color: #2c3e50;">
+              ${getExperienceDisplay(job.experienceLevel)}
+            </div>
             <p class="job-company">
-              🏢 ${job.company}
+              🏢 ${job.company || 'Company Not Available'}
               ${job.postedBy && job.postedBy.isVerified ? '<span class="verified-badge">✓ Verified</span>' : ''}
             </p>
-            <p class="job-location">📍 ${job.location}</p>
-            <p class="job-description">${job.description.substring(0, 150)}...</p>
+            <p class="job-location">📍 ${job.location || 'Location Not Available'}</p>
+            <p class="job-description">${(job.description || 'No description available').substring(0, 150)}...</p>
             <div class="job-footer">
               <span class="job-salary">${job.salary || 'Salary not disclosed'}</span>
               <div>
@@ -97,8 +160,24 @@
                   View Details
                 </button>
                 ${isLoggedIn() && getUser() && getUser().role === 'jobseeker' ? `
-                  <button class="btn btn-primary btn-small" onclick="applyToJob('${job._id}')">
-                    Apply Now
+                  ${hasApplied ? `
+                    <button class="btn btn-secondary btn-small" disabled>
+                      Applied ✓
+                    </button>
+                  ` : `
+                    <button class="btn btn-primary btn-small" onclick="openChallengeModal('${job._id}')">
+                      Apply Now
+                    </button>
+                  `}
+                ` : ''}
+                ${!isLoggedIn() ? `
+                  <button class="btn btn-primary btn-small" onclick="showLoginPrompt()">
+                    Login to Apply
+                  </button>
+                ` : ''}
+                ${isLoggedIn() && getUser() && getUser().role !== 'jobseeker' ? `
+                  <button class="btn btn-secondary btn-small" disabled>
+                    Only for Job Seekers
                   </button>
                 ` : ''}
                 ${isLoggedIn() ? `
@@ -109,7 +188,8 @@
               </div>
             </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
 
       } catch (error) {
         loading.style.display = 'none';
@@ -122,8 +202,78 @@
       window.open(`job-details.html?id=${jobId}`, '_blank');
     }
 
-    // Apply to job
-    async function applyToJob(jobId) {
+    async function openChallengeModal(jobId) {
+      selectedJobForApply = jobId;
+      const existingModal = document.getElementById('challengeModal');
+      if (!existingModal) {
+        createChallengeModal();
+      }
+      const modal = document.getElementById('challengeModal');
+      const questionEl = document.getElementById('challengeQuestionText');
+      const textarea = document.getElementById('challengeAnswer');
+
+      try {
+        const job = await apiRequest(`/jobs/${jobId}`);
+        const challengeQuestion = job.challengeQuestion;
+        if (challengeQuestion && challengeQuestion.trim()) {
+          questionEl.textContent = `Employer's Task: ${challengeQuestion}`;
+        } else {
+          questionEl.textContent = "Task: Briefly explain why you are a strong fit for this role, and share any relevant links (GitHub, portfolio, etc.).";
+        }
+      } catch (error) {
+        showAlert('Failed to load the employer task: ' + error.message, 'error');
+        return;
+      }
+      textarea.value = '';
+      updateChallengeSubmitState();
+      modal.style.display = 'block';
+    }
+
+    function closeChallengeModal() {
+      const modal = document.getElementById('challengeModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function createChallengeModal() {
+      const modalHtml = `
+        <div id="challengeModal" class="modal-overlay">
+          <div class="modal-content" style="max-width: 600px;">
+            <h3>Application Task</h3>
+            <p id="challengeQuestionText" style="margin-bottom: 1rem;"></p>
+            <textarea id="challengeAnswer" rows="6" class="form-control" oninput="updateChallengeSubmitState()" placeholder="Type your detailed answer or paste relevant links here..." style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #ccc;"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+              <button class="btn btn-secondary btn-small" type="button" onclick="closeChallengeModal()">Cancel</button>
+              <button id="challengeSubmitBtn" class="btn btn-primary btn-small" type="button" onclick="submitApplicationWithChallenge()" disabled>Submit Application</button>
+            </div>
+          </div>
+        </div>
+      `;
+      const container = document.createElement('div');
+      container.innerHTML = modalHtml;
+      document.body.appendChild(container.firstElementChild);
+    }
+
+    function updateChallengeSubmitState() {
+      const textarea = document.getElementById('challengeAnswer');
+      const submitBtn = document.getElementById('challengeSubmitBtn');
+      if (!textarea || !submitBtn) return;
+      submitBtn.disabled = !textarea.value.trim();
+    }
+
+    // Final submit with challenge
+    async function submitApplicationWithChallenge() {
+      if (!selectedJobForApply) {
+        showAlert('No job selected for application', 'error');
+        return;
+      }
+
+      const answer = document.getElementById('challengeAnswer').value.trim();
+
+      if (!answer) {
+        showAlert('Please complete the mandatory screening task before submitting.', 'error');
+        return;
+      }
+
       if (!isLoggedIn()) {
         showAlert('Please login to apply for jobs', 'error');
         setTimeout(() => {
@@ -141,13 +291,35 @@
       try {
         const data = await apiRequest('/applications', {
           method: 'POST',
-          body: JSON.stringify({ jobId }),
+          body: JSON.stringify({ jobId: selectedJobForApply, challengeSubmission: answer }),
         });
 
         showAlert(data.message, 'success');
+        closeChallengeModal();
+        
+        // Update the apply button to show applied status
+        const applyButton = document.querySelector(`button[onclick="openChallengeModal('${selectedJobForApply}')"]`);
+        if (applyButton) {
+          applyButton.disabled = true;
+          applyButton.textContent = 'Applied ✓';
+          applyButton.classList.remove('btn-primary');
+          applyButton.classList.add('btn-secondary');
+          applyButton.onclick = null; // Remove click handler
+        }
+        
+        // Reload jobs to update all button states
+        setTimeout(() => loadJobs(), 1000);
       } catch (error) {
         showAlert(error.message, 'error');
       }
+    }
+
+    // Show login prompt
+    function showLoginPrompt() {
+      showAlert('Please login to apply for jobs. Redirecting to login page...', 'info');
+      setTimeout(() => {
+        window.location.href = 'login.html';
+      }, 2000);
     }
 
     // Load jobs on page load

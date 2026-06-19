@@ -129,8 +129,14 @@
           </div>
 
           <div class="form-group">
+            <label for="challengeQuestion">Mandatory Screening Task/Question</label>
+            <textarea id="challengeQuestion" rows="4" placeholder="e.g. Share a GitHub link to a REST API you built, or describe how you would design a scalable notification system."></textarea>
+            <small style="color: #7f8c8d;">Candidates must answer this before they can submit an application.</small>
+          </div>
+
+          <div class="form-group">
             <label for="applicationDeadline">Application Deadline</label>
-            <input type="date" id="applicationDeadline" min="<?php echo date('Y-m-d'); ?>">
+            <input type="date" id="applicationDeadline">
           </div>
 
           <div class="form-group">
@@ -139,10 +145,10 @@
           </div>
 
           <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem;">
-            ℹ️ Your job will be reviewed by admin before going live
+            ℹ️ Your job will go live immediately for job seekers once posted.
           </p>
 
-          <button type="submit" class="btn btn-success">Submit Job for Review</button>
+          <button type="submit" class="btn btn-success">Post Job</button>
         </form>
       </div>
     </div>
@@ -248,7 +254,8 @@
         experienceLevel: document.getElementById('experienceLevel').value,
         openings: parseInt(document.getElementById('openings').value) || 1,
         requiredSkills: requiredSkills,
-        applicationDeadline: document.getElementById('applicationDeadline').value || null
+        applicationDeadline: document.getElementById('applicationDeadline').value || null,
+        challengeQuestion: document.getElementById('challengeQuestion').value
       };
 
       try {

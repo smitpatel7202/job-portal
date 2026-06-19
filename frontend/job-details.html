@@ -113,6 +113,7 @@
   <script>
     let currentJobId = null;
     let currentJob = null;
+    let selectedJobForApply = null;
 
     async function loadJobDetails() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -169,12 +170,28 @@
           const jobDetails = document.getElementById('jobDetails');
           jobDetails.parentNode.insertBefore(statusBanner, jobDetails);
         }
+        // Get experience level display with emoji and years
+        const getExperienceDisplay = (level) => {
+          switch(level) {
+            case 'Entry':
+              return '🟢 Entry-Level (0-1 Yrs)';
+            case 'Mid':
+              return '🔵 Mid-Level (1-3 Yrs)';
+            case 'Senior':
+              return '🟡 Experienced (3+ Yrs)';
+            case 'Lead':
+              return '🔴 Lead/Manager';
+            default:
+              return '⚪ Not Specified';
+          }
+        };
+        
         document.getElementById('jobTitle').textContent = job.title;
         document.getElementById('jobCompany').textContent = `🏢 ${job.company}`;
         document.getElementById('jobLocation').textContent = `📍 ${job.location}`;
         document.getElementById('jobType').textContent = job.type;
         document.getElementById('jobWorkMode').textContent = job.workMode || 'On-site';
-        document.getElementById('jobExperience').textContent = `${job.experienceLevel || 'Entry'} Level`;
+        document.getElementById('jobExperience').textContent = getExperienceDisplay(job.experienceLevel);
         document.getElementById('jobDescription').textContent = job.description;
         document.getElementById('jobSalary').textContent = job.salary || 'Salary not disclosed';
         
@@ -293,13 +310,35 @@
           }
         }
 
-        // Apply button visibility
+        // Apply button visibility and state
         const user = getUser();
         const applyBtn = document.getElementById('applyBtn');
         if (!user || user.role !== 'jobseeker' || job.hasLimitedAccess) {
           applyBtn.style.display = 'none';
         } else {
-          applyBtn.style.display = 'block';
+          // Check if user has already applied
+          try {
+            const userApplications = await apiRequest('/applications/my');
+            const hasApplied = userApplications.some(app => app.jobId._id === currentJobId);
+            
+            if (hasApplied) {
+              applyBtn.textContent = 'Applied ✓';
+              applyBtn.disabled = true;
+              applyBtn.classList.remove('btn-primary');
+              applyBtn.classList.add('btn-secondary');
+              applyBtn.onclick = null;
+            } else {
+              applyBtn.textContent = 'Apply Now';
+              applyBtn.disabled = false;
+              applyBtn.classList.add('btn-primary');
+              applyBtn.classList.remove('btn-secondary');
+              applyBtn.onclick = applyToJob;
+            }
+            applyBtn.style.display = 'block';
+          } catch (error) {
+            console.error('Failed to check application status:', error);
+            applyBtn.style.display = 'block';
+          }
         }
 
       } catch (error) {
@@ -308,7 +347,106 @@
       }
     }
 
-    async function applyToJob() {
+    async function openChallengeModalForJobDetails() {
+      if (!currentJobId) {
+        showAlert('Job details not loaded yet', 'error');
+        return;
+      }
+      selectedJobForApply = currentJobId;
+
+      const existingModal = document.getElementById('challengeModal');
+      if (!existingModal) {
+        createChallengeModal();
+      }
+
+      const modal = document.getElementById('challengeModal');
+      const questionEl = document.getElementById('challengeQuestionText');
+      const textarea = document.getElementById('challengeAnswer');
+
+      try {
+        const job = await apiRequest(`/jobs/${currentJobId}`);
+        currentJob = job;
+        const challengeQuestion = job.challengeQuestion;
+        if (challengeQuestion && challengeQuestion.trim()) {
+          questionEl.textContent = `Employer's Task: ${challengeQuestion}`;
+        } else {
+          questionEl.textContent = "Task: Briefly explain why you are a strong fit for this role, and share any relevant links (GitHub, portfolio, etc.).";
+        }
+      } catch (error) {
+        showAlert('Failed to load the employer task: ' + error.message, 'error');
+        return;
+      }
+      textarea.value = '';
+      updateChallengeSubmitState();
+      modal.style.display = 'flex';
+      
+      // Add click outside listener
+      modal.addEventListener('click', handleModalClick);
+    }
+
+    function createChallengeModal() {
+      const modalHtml = `
+        <div id="challengeModal" class="modal-overlay">
+          <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+              <h3 style="margin: 0;">Application Task</h3>
+              <button class="btn btn-secondary btn-small" type="button" onclick="closeChallengeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; padding: 0; width: 30px; height: 30px;">×</button>
+            </div>
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #3498db;">
+              <p id="challengeQuestionText" style="margin: 0; color: #2c3e50; font-weight: 500;"></p>
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+              <label for="challengeAnswer" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #2c3e50;">Your Response:</label>
+              <textarea id="challengeAnswer" rows="6" class="form-control" oninput="updateChallengeSubmitState()" placeholder="Type your detailed answer or paste relevant links here..."></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+              <button class="btn btn-secondary" type="button" onclick="closeChallengeModal()">Cancel</button>
+              <button id="challengeSubmitBtn" class="btn btn-primary" type="button" onclick="submitApplicationWithChallenge()" disabled>Submit Application</button>
+            </div>
+          </div>
+        </div>
+      `;
+      const container = document.createElement('div');
+      container.innerHTML = modalHtml;
+      document.body.appendChild(container.firstElementChild);
+    }
+
+    function updateChallengeSubmitState() {
+      const textarea = document.getElementById('challengeAnswer');
+      const submitBtn = document.getElementById('challengeSubmitBtn');
+      if (!textarea || !submitBtn) return;
+      submitBtn.disabled = !textarea.value.trim();
+    }
+
+    function closeChallengeModal() {
+      const modal = document.getElementById('challengeModal');
+      if (modal) {
+        modal.style.display = 'none';
+        modal.removeEventListener('click', handleModalClick);
+      }
+    }
+
+    // Close modal when clicking outside
+    function handleModalClick(event) {
+      const modal = document.getElementById('challengeModal');
+      if (modal && event.target === modal) {
+        closeChallengeModal();
+      }
+    }
+
+    async function submitApplicationWithChallenge() {
+      if (!selectedJobForApply) {
+        showAlert('No job selected for application', 'error');
+        return;
+      }
+
+      const answer = document.getElementById('challengeAnswer').value.trim();
+
+      if (!answer) {
+        showAlert('Please complete the mandatory screening task before submitting.', 'error');
+        return;
+      }
+
       if (!isLoggedIn()) {
         showAlert('Please login to apply', 'error');
         setTimeout(() => window.location.href = 'login.html', 2000);
@@ -324,15 +462,39 @@
       try {
         const data = await apiRequest('/applications', {
           method: 'POST',
-          body: JSON.stringify({ jobId: currentJobId }),
+          body: JSON.stringify({ jobId: selectedJobForApply, challengeSubmission: answer }),
         });
 
         showAlert(data.message, 'success');
-        document.getElementById('applyBtn').disabled = true;
-        document.getElementById('applyBtn').textContent = 'Applied ✓';
+        closeChallengeModal();
+        
+        // Update the apply button to show applied status
+        const applyBtn = document.getElementById('applyBtn');
+        if (applyBtn) {
+          applyBtn.disabled = true;
+          applyBtn.textContent = 'Applied ✓';
+          applyBtn.classList.remove('btn-primary');
+          applyBtn.classList.add('btn-secondary');
+          applyBtn.onclick = null; // Remove click handler
+        }
       } catch (error) {
         showAlert(error.message, 'error');
       }
+    }
+
+    async function applyToJob() {
+      if (!isLoggedIn()) {
+        showAlert('Please login to apply', 'error');
+        setTimeout(() => window.location.href = 'login.html', 2000);
+        return;
+      }
+
+      const user = getUser();
+      if (user.role !== 'jobseeker') {
+        showAlert('Only job seekers can apply', 'error');
+        return;
+      }
+      openChallengeModalForJobDetails();
     }
 
     document.addEventListener('DOMContentLoaded', () => {

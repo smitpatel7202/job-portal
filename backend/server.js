@@ -17,6 +17,7 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { analyzeResumeAgainstJob } = require('./services/aiService');
 
 const app = express();
 
@@ -38,24 +39,27 @@ app.get('/api/health', (req, res) => {
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, curl requests, or file://)
     if (!origin) return callback(null, true);
  
-    // In production, allow your Netlify domain
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+ 
+    // In production, allow specific domains
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:5500',
       'http://127.0.0.1:5500',
+      'http://127.0.0.1:3000',
       'https://job-1portal.netlify.app' // Your Netlify URL
     ];
- 
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
  
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -308,6 +312,8 @@ const jobSchema = new mongoose.Schema({
   openings: { type: Number, default: 1 },
   workMode: { type: String, enum: ['Remote', 'On-site', 'Hybrid'], default: 'On-site' },
   applicationDeadline: { type: Date },
+  // Proof-of-work micro-challenge configured by employer
+  challengeQuestion: { type: String },
 
   // Moderation
   status: { type: String, enum: ['pending', 'approved', 'rejected', 'closed'], default: 'pending' },
@@ -329,9 +335,17 @@ const applicationSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'shortlisted', 'rejected', 'accepted'], default: 'pending' },
   coverLetter: { type: String },
   resumeUsed: { type: String },
+  // Candidate's answer to the job's mandatory screening task/question
+  challengeSubmission: { type: String },
   appliedAt: { type: Date, default: Date.now },
   statusUpdatedAt: { type: Date, default: Date.now },
-  employerNotes: { type: String }
+  employerNotes: { type: String },
+  aiAnalysis: { type: mongoose.Schema.Types.Mixed },
+  matchScore: { type: Number },
+  aiRoadmap: [{
+    skill: { type: String },
+    link: { type: String }
+  }]
 });
 
 // Notification Schema
@@ -436,7 +450,6 @@ app.post('/api/auth/register', async (req, res) => {
       <h2>Welcome to Job Portal!</h2>
       <p>Hi ${name},</p>
       <p>Your account has been created successfully as a <strong>${role || 'jobseeker'}</strong>.</p>
-      ${role === 'employer' ? '<p><strong>Note:</strong> Your account requires admin verification before you can post jobs.</p>' : ''}
       <p>Start exploring opportunities today!</p>
     `;
     await sendEmail(email, 'Welcome to Job Portal', emailHtml);
@@ -920,13 +933,10 @@ app.post('/api/jobs', authMiddleware, roleMiddleware('employer'), async (req, re
       });
     }
 
-    // Check if profile is verified by admin
-    if (!user.isVerified) {
-      return res.status(403).json({ error: 'Your profile is pending admin review. You can post jobs after admin approval.' });
-    }
+    // Profile verification check removed - employers can post jobs directly
 
     const { title, description, company, location, salary, type, category,
-      requiredSkills, experienceLevel, openings, workMode, applicationDeadline } = req.body;
+      requiredSkills, experienceLevel, openings, workMode, applicationDeadline, challengeQuestion } = req.body;
 
     if (!title || !description || !company || !location || !category) {
       return res.status(400).json({ error: 'All required fields must be filled' });
@@ -935,26 +945,17 @@ app.post('/api/jobs', authMiddleware, roleMiddleware('employer'), async (req, re
     const job = new Job({
       title, description, company, location, salary, type, category,
       requiredSkills, experienceLevel, openings, workMode, applicationDeadline,
+      challengeQuestion: challengeQuestion || '',
       postedBy: req.user.id,
-      status: 'pending' // Goes to admin approval
+      status: 'approved' // Jobs are approved immediately
     });
 
     await job.save();
 
-    // Notify admins
-    const admins = await User.find({ role: 'admin' });
-    for (const admin of admins) {
-      await createNotification(
-        admin._id,
-        'New Job Posted',
-        `${company} posted a new job: ${title}`,
-        'job',
-        `/admin/jobs/${job._id}`
-      );
-    }
+    // Admin notifications removed - jobs are approved immediately
 
     res.status(201).json({
-      message: 'Job submitted for admin approval',
+      message: 'Job posted successfully',
       job
     });
   } catch (error) {
@@ -1196,10 +1197,10 @@ app.put('/api/notifications/:id/read', authMiddleware, async (req, res) => {
 // APPLICATION ROUTES
 // ============================================
 
-// Apply to job
+// Apply to job (with challenge + AI analysis)
 app.post('/api/applications', authMiddleware, async (req, res) => {
   try {
-    const { jobId, coverLetter } = req.body;
+    const { jobId, coverLetter, challengeSubmission } = req.body;
     const user = await User.findById(req.user.id);
 
     if (user.role !== 'jobseeker') {
@@ -1215,6 +1216,15 @@ app.post('/api/applications', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'This job is not available for applications' });
     }
 
+    // Enforce application deadline (end of deadline day)
+    if (job.applicationDeadline) {
+      const deadline = new Date(job.applicationDeadline);
+      deadline.setHours(23, 59, 59, 999);
+      if (deadline < new Date()) {
+        return res.status(400).json({ error: 'Job application deadline has passed' });
+      }
+    }
+
     // Check if already applied
     const existingApplication = await Application.findOne({ jobId, userId: req.user.id });
     if (existingApplication) {
@@ -1226,12 +1236,64 @@ app.post('/api/applications', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Please upload your resume before applying' });
     }
 
+    // Enforce task submission before apply (always required)
+    if (!challengeSubmission || !challengeSubmission.trim()) {
+      return res.status(400).json({ error: 'Please complete the mandatory screening task before applying' });
+    }
+
+    let aiAnalysis = null;
+    let matchScore = null;
+    let aiRoadmap = [];
+    try {
+      const candidateSkills = (user.skills || []).map(s => String(s).trim()).filter(Boolean);
+      const requiredSkills = (job.requiredSkills || []).map(s => String(s).trim()).filter(Boolean);
+
+      const resumeText = `Candidate: ${user.name}
+Skills: ${(user.skills || []).join(', ')}
+Location: ${user.location || 'N/A'}
+Experience summary: ${(user.experience || []).map(e => e.title).join(', ')}`;
+
+      const analysis = await analyzeResumeAgainstJob({
+        resumeText,
+        jobDescription: `${job.title}\n\n${job.description}\n\nREQUIRED SKILLS (from job post): ${requiredSkills.join(', ')}`
+      });
+      aiAnalysis = analysis;
+      aiRoadmap = Array.isArray(analysis.aiRoadmap) ? analysis.aiRoadmap : [];
+
+      // Combine AI score with hard overlap of required vs candidate skills for better accuracy
+      const aiScore = typeof analysis.matchScore === 'number' ? analysis.matchScore : null;
+      let overlapScore = null;
+      if (requiredSkills.length && candidateSkills.length) {
+        const overlap = requiredSkills.filter(rs =>
+          candidateSkills.some(cs => cs.toLowerCase() === rs.toLowerCase())
+        );
+        overlapScore = Math.round((overlap.length / requiredSkills.length) * 100);
+      }
+
+      if (aiScore !== null && overlapScore !== null) {
+        // Weighted blend: 70% AI judgment, 30% strict skill overlap
+        matchScore = Math.round(aiScore * 0.7 + overlapScore * 0.3);
+      } else if (aiScore !== null) {
+        matchScore = aiScore;
+      } else if (overlapScore !== null) {
+        matchScore = overlapScore;
+      } else {
+        matchScore = null;
+      }
+    } catch (e) {
+      console.error('AI analysis failed during application:', e.message || e);
+    }
+
     const application = new Application({
       jobId,
       userId: req.user.id,
       coverLetter: coverLetter || '',
       resumeUsed: user.resume,
-      status: 'pending'
+      challengeSubmission: challengeSubmission.trim(),
+      status: 'pending',
+      aiAnalysis,
+      matchScore,
+      aiRoadmap
     });
 
     await application.save();

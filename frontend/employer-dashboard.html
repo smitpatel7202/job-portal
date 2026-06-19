@@ -166,6 +166,22 @@
           const deadlineStatus = job.deadlineStatus;
           const openingStatus = job.openingStatus;
           
+          // Get experience level display with emoji and years
+          const getExperienceDisplay = (level) => {
+            switch(level) {
+              case 'Entry':
+                return '🟢 Entry-Level (0-1 Yrs)';
+              case 'Mid':
+                return '🔵 Mid-Level (1-3 Yrs)';
+              case 'Senior':
+                return '🟡 Experienced (3+ Yrs)';
+              case 'Lead':
+                return '🔴 Lead/Manager';
+              default:
+                return '⚪ Not Specified';
+            }
+          };
+          
           return `
           <div class="job-card ${hasNewApplications ? 'has-new-applications' : ''}">
             <div class="job-header">
@@ -180,6 +196,9 @@
                 <button class="btn btn-small btn-primary" onclick="viewApplications('${job._id}')">View Applications</button>
                 <button class="btn btn-small btn-danger" onclick="deleteJob('${job._id}')">Delete</button>
               </div>
+            </div>
+            <div class="experience-tag" data-level="${job.experienceLevel}" style="margin: 8px 0; font-weight: bold; color: #2c3e50;">
+              ${getExperienceDisplay(job.experienceLevel)}
             </div>
             <div class="job-details">
               <p><strong>📍 Location:</strong> ${job.location}</p>
@@ -219,6 +238,10 @@
         const data = await apiRequest(`/jobs/${jobId}/applications`);
         const token = getToken();
         const resumeTokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+
+        // Index applications for modal actions (task + skill gap)
+        window.__applicationsById = {};
+        data.forEach(a => { window.__applicationsById[a._id] = a; });
         
         if (data.length === 0) {
           showAlert('No applications yet for this job', 'info');
@@ -234,6 +257,11 @@
         data.forEach(app => {
           const resumeUrl = `${API_URL.replace('/api', '')}/api/resume/${app.userId._id}${resumeTokenParam}`;
           const isPdf = (app.userId.resume || '').toLowerCase().endsWith('.pdf');
+          const analysis = app.aiAnalysis || {};
+          const matchScore = (typeof app.matchScore === 'number')
+            ? app.matchScore
+            : (typeof analysis.matchPercentage === 'number' ? analysis.matchPercentage : null);
+          const missingSkillsCount = Array.isArray(analysis.missingSkills) ? analysis.missingSkills.length : 0;
           applicationsHTML += `
             <div class="application-card" style="border: 1px solid #ddd; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: start;">
@@ -244,6 +272,17 @@
                   ${app.userId.location ? `<p>📍 ${app.userId.location}</p>` : ''}
                   <p style="color: #7f8c8d; font-size: 0.9rem;">Applied: ${new Date(app.appliedAt).toLocaleDateString()}</p>
                   <button class="btn btn-small btn-primary" onclick="viewJobSeekerProfile('${app.userId._id}')" style="margin-top: 0.5rem; margin-right: 5px;">View Full Profile</button>
+
+                  <div style="margin-top: 0.75rem; display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-small btn-secondary" onclick="openCompletedTask('${app._id}')">View Completed Task</button>
+                    <button class="btn btn-small btn-info" onclick="openSkillGap('${app._id}')">Missing Skills</button>
+                  </div>
+
+                  <div style="margin-top: 0.75rem; padding: 0.75rem; background: #f9fbff; border-radius: 6px; border: 1px solid #e6eefb;">
+                    <strong>AI Match Score:</strong> ${matchScore === null ? 'N/A' : `${matchScore}%`}
+                    <span style="margin-left: 10px; color: #7f8c8d;">• Missing skills: ${missingSkillsCount}</span>
+                  </div>
+
                   <div class="resume-section" style="margin-top: 1rem;">
                     ${app.userId.resume ? `
                       <div style="margin-bottom: 0.5rem;">
@@ -286,6 +325,78 @@
       } catch (error) {
         showAlert('Failed to load applications: ' + error.message, 'error');
       }
+    }
+
+    function openCompletedTask(appId) {
+      const app = window.__applicationsById ? window.__applicationsById[appId] : null;
+      if (!app) return showAlert('Application not found', 'error');
+
+      const taskText = (app.challengeSubmission || '').trim();
+      const html = `
+        <div id="taskModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: flex; align-items: center; justify-content: center;">
+          <div style="background: white; padding: 1.5rem; border-radius: 10px; max-width: 700px; width: 95%; max-height: 80vh; overflow-y: auto; position: relative;">
+            <button onclick="closeTaskModal()" style="position: absolute; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+            <h3 style="margin-bottom: 1rem;">✅ Completed Task Submission</h3>
+            <div style="white-space: pre-wrap; background:#f8f9fa; border: 1px solid #eee; padding: 1rem; border-radius: 8px;">${taskText || 'No submission provided.'}</div>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function closeTaskModal() {
+      const modal = document.getElementById('taskModal');
+      if (modal) modal.remove();
+    }
+
+    function openSkillGap(appId) {
+      const app = window.__applicationsById ? window.__applicationsById[appId] : null;
+      if (!app) return showAlert('Application not found', 'error');
+
+      const analysis = app.aiAnalysis || {};
+      const matchScore = (typeof app.matchScore === 'number')
+        ? app.matchScore
+        : (typeof analysis.matchPercentage === 'number' ? analysis.matchPercentage : null);
+      const missingSkills = Array.isArray(analysis.missingSkills) ? analysis.missingSkills : [];
+      const roadmapLinks = Array.isArray(analysis.roadmapLinks) ? analysis.roadmapLinks : [];
+
+      const missingHtml = missingSkills.length
+        ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+            ${missingSkills.map(s => `<span style="background:#ffeaa7; padding:4px 10px; border-radius: 20px; font-size:0.85rem;">${s}</span>`).join('')}
+           </div>`
+        : `<p style="margin-top:8px; color:#27ae60;"><strong>Great fit:</strong> No major missing skills detected.</p>`;
+
+      const roadmapHtml = roadmapLinks.length
+        ? `<ul style="margin: 8px 0 0 1.25rem;">
+            ${roadmapLinks.slice(0, 8).map(l => `<li><a href="${l.url}" target="_blank" style="color:#2980b9;">${l.topic || l.url}</a></li>`).join('')}
+           </ul>`
+        : `<p style="margin-top:8px; color:#7f8c8d;">No roadmap links available.</p>`;
+
+      const html = `
+        <div id="skillGapModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: flex; align-items: center; justify-content: center;">
+          <div style="background: white; padding: 1.5rem; border-radius: 10px; max-width: 800px; width: 95%; max-height: 80vh; overflow-y: auto; position: relative;">
+            <button onclick="closeSkillGapModal()" style="position: absolute; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+            <h3 style="margin-bottom: 0.75rem;">🧠 AI Skill Gap Analyzer</h3>
+            <p style="margin:0; color:#7f8c8d;">Match score: <strong>${matchScore === null ? 'N/A' : `${matchScore}%`}</strong></p>
+
+            <div style="margin-top: 1rem;">
+              <h4 style="margin-bottom: 0.25rem;">Missing / Weak Skills</h4>
+              ${missingHtml}
+            </div>
+
+            <div style="margin-top: 1rem;">
+              <h4 style="margin-bottom: 0.25rem;">Suggested Roadmap</h4>
+              ${roadmapHtml}
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function closeSkillGapModal() {
+      const modal = document.getElementById('skillGapModal');
+      if (modal) modal.remove();
     }
 
     function closeApplicationsModal() {

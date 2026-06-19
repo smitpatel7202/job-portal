@@ -99,6 +99,9 @@
 
       try {
         const data = await apiRequest('/applications/my');
+        // Cache applications for per-application modals
+        window.__myApplications = {};
+        data.forEach(app => { window.__myApplications[app._id] = app; });
         
         loading.style.display = 'none';
 
@@ -125,28 +128,46 @@
         document.getElementById('acceptedApps').textContent = stats.accepted;
         document.getElementById('rejectedApps').textContent = stats.rejected;
 
-        // Display applications
-        container.innerHTML = data.map(app => `
-          <div class="application-card" style="border: 1px solid #ddd; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px; ${app.status === 'shortlisted' ? 'border-left: 4px solid #27ae60; background: #f0f9f4;' : app.status === 'accepted' ? 'border-left: 4px solid #3498db; background: #ebf5fb;' : ''}">
-            <div class="application-info">
-              <h4 style="margin-bottom: 0.5rem;">${app.jobId.title}</h4>
-              <p>🏢 ${app.jobId.company}</p>
-              <p>📍 ${app.jobId.location}</p>
-              <p style="color: #7f8c8d; font-size: 0.85rem;">
-                Applied on ${new Date(app.appliedAt).toLocaleDateString()}
-              </p>
-              ${app.status === 'shortlisted' ? '<p style="color: #27ae60; font-weight: bold; margin-top: 0.5rem;">🎉 Congratulations! You have been shortlisted!</p>' : ''}
-              ${app.status === 'accepted' ? '<p style="color: #3498db; font-weight: bold; margin-top: 0.5rem;">✅ Your application has been accepted!</p>' : ''}
-              ${app.employerNotes ? `<div style="margin-top: 1rem; padding: 1rem; background: #fff3cd; border-radius: 5px;"><strong>📝 Notes from Employer:</strong><br>${app.employerNotes}</div>` : ''}
-              <button class="btn btn-primary btn-small" onclick="viewJobDetails('${app.jobId._id}', '${app.status}')" style="margin-top: 1rem;">View Job Details</button>
+        container.innerHTML = data.map(app => {
+          const matchScore = typeof app.matchScore === 'number' ? app.matchScore : null;
+          const aiAnalysis = app.aiAnalysis || {};
+          const aiRoadmap = Array.isArray(app.aiRoadmap) ? app.aiRoadmap : [];
+          const missingSkills = Array.isArray(aiAnalysis.missingSkills) ? aiAnalysis.missingSkills : [];
+          const hasAnalysis = matchScore !== null || missingSkills.length || aiRoadmap.length;
+
+          // Safely get job information with fallbacks
+          const jobTitle = app.jobId?.title || 'Job Title Not Available';
+          const jobCompany = app.jobId?.company || 'Company Not Available';
+          const jobLocation = app.jobId?.location || 'Location Not Available';
+          const jobId = app.jobId?._id || app._id;
+
+          return `
+            <div class="application-card" style="border: 1px solid #ddd; padding: 1.5rem; margin-bottom: 1rem; border-radius: 8px; ${app.status === 'shortlisted' ? 'border-left: 4px solid #27ae60; background: #f0f9f4;' : app.status === 'accepted' ? 'border-left: 4px solid #3498db; background: #ebf5fb;' : ''}">
+              <div class="application-info">
+                <h4 style="margin-bottom: 0.5rem;">${jobTitle}</h4>
+                <p>🏢 ${jobCompany}</p>
+                <p>📍 ${jobLocation}</p>
+                <p style="color: #7f8c8d; font-size: 0.85rem;">
+                  Applied on ${new Date(app.appliedAt).toLocaleDateString()}
+                </p>
+                ${matchScore !== null ? `<p style="margin-top: 0.5rem;"><strong>Match Score:</strong> ${matchScore}%</p>` : ''}
+                ${app.status === 'shortlisted' ? '<p style="color: #27ae60; font-weight: bold; margin-top: 0.5rem;">🎉 Congratulations! You have been shortlisted!</p>' : ''}
+                ${app.status === 'accepted' ? '<p style="color: #3498db; font-weight: bold; margin-top: 0.5rem;">✅ Your application has been accepted!</p>' : ''}
+                ${app.employerNotes ? `<div style="margin-top: 1rem; padding: 1rem; background: #fff3cd; border-radius: 5px;"><strong>📝 Notes from Employer:</strong><br>${app.employerNotes}</div>` : ''}
+                <div style="margin-top: 1rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
+                  <button class="btn btn-primary btn-small" onclick="viewJobDetails('${jobId}', '${app.status}')">View Job Details</button>
+                  ${hasAnalysis ? `<button class="btn btn-secondary btn-small" onclick="openMissingSkills('${app._id}')">View Missing Skills</button>` : ''}
+                  ${aiRoadmap.length ? `<button class="btn btn-info btn-small" onclick="openRoadmap('${app._id}')">View Roadmap</button>` : ''}
+                </div>
+              </div>
+              <div>
+                <span class="status-badge status-${app.status}" style="display: inline-block; padding: 8px 15px; border-radius: 20px; font-weight: bold;">
+                  ${app.status === 'shortlisted' ? '⭐ Shortlisted' : app.status === 'accepted' ? '✅ Accepted' : app.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
+                </span>
+              </div>
             </div>
-            <div>
-              <span class="status-badge status-${app.status}" style="display: inline-block; padding: 8px 15px; border-radius: 20px; font-weight: bold;">
-                ${app.status === 'shortlisted' ? '⭐ Shortlisted' : app.status === 'accepted' ? '✅ Accepted' : app.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
-              </span>
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
 
       } catch (error) {
         loading.style.display = 'none';
@@ -159,6 +180,82 @@
       // Open job details page with status info
       const url = `job-details.html?id=${jobId}&status=${status}&from=dashboard`;
       window.open(url, '_blank');
+    }
+
+    function openMissingSkills(appId) {
+      const app = window.__myApplications ? window.__myApplications[appId] : null;
+      if (!app) return;
+
+      const analysis = app.aiAnalysis || {};
+      const matchScore = typeof app.matchScore === 'number' ? app.matchScore : null;
+      const missingSkills = Array.isArray(analysis.missingSkills) ? analysis.missingSkills : [];
+      const jobTitle = app.jobId?.title || 'Job Title Not Available';
+
+      const missingHtml = missingSkills.length
+        ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+             ${missingSkills.map(s => `<span style="background:#ffeaa7; padding:4px 10px; border-radius:20px; font-size:0.85rem;">${s}</span>`).join('')}
+           </div>`
+        : `<p style="margin-top:8px; color:#27ae60;">No major missing skills detected for this job.</p>`;
+
+      const html = `
+        <div id="seekerSkillGapModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: flex; align-items: center; justify-content: center;">
+          <div style="background: white; padding: 1.5rem; border-radius: 10px; max-width: 800px; width: 95%; max-height: 80vh; overflow-y: auto; position: relative;">
+            <button onclick="closeSeekerSkillGapModal()" style="position: absolute; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+            <h3 style="margin-bottom: 0.75rem;">🧠 Missing Skills for "${jobTitle}"</h3>
+            ${matchScore !== null ? `<p style="margin:0 0 0.5rem 0; color:#7f8c8d;">Match score: <strong>${matchScore}%</strong></p>` : ''}
+            <div>
+              <h4 style="margin-bottom: 0.25rem;">Skills to Improve</h4>
+              ${missingHtml}
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function closeSeekerSkillGapModal() {
+      const modal = document.getElementById('seekerSkillGapModal');
+      if (modal) modal.remove();
+    }
+
+    function openRoadmap(appId) {
+      const app = window.__myApplications ? window.__myApplications[appId] : null;
+      if (!app) return;
+
+      const aiRoadmap = Array.isArray(app.aiRoadmap) ? app.aiRoadmap : [];
+      const jobTitle = app.jobId?.title || 'Job Title Not Available';
+      
+      if (!aiRoadmap.length) {
+        showAlert('No roadmap available yet for this application.', 'info');
+        return;
+      }
+
+      const listHtml = `
+        <ul style="margin: 0.5rem 0 0 1.25rem;">
+          ${aiRoadmap.slice(0, 8).map(item => `
+            <li>
+              <a href="${item.link}" target="_blank" style="color:#2980b9;">${item.skill || item.link}</a>
+            </li>
+          `).join('')}
+        </ul>
+      `;
+
+      const html = `
+        <div id="seekerRoadmapModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1100; display: flex; align-items: center; justify-content: center;">
+          <div style="background: white; padding: 1.5rem; border-radius: 10px; max-width: 800px; width: 95%; max-height: 80vh; overflow-y: auto; position: relative;">
+            <button onclick="closeSeekerRoadmapModal()" style="position: absolute; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+            <h3 style="margin-bottom: 0.75rem;">🧭 Learning Roadmap for "${jobTitle}"</h3>
+            <p style="color:#7f8c8d; margin-bottom: 0.5rem;">Use these resources to upskill for this specific role.</p>
+            ${listHtml}
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function closeSeekerRoadmapModal() {
+      const modal = document.getElementById('seekerRoadmapModal');
+      if (modal) modal.remove();
     }
 
     // Load applications on page load
