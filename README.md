@@ -1,5 +1,7 @@
 🧑‍💼 Job Portal – Full Stack Web Application
 
+live on : https://job-1portal.netlify.app
+
 A complete Job Portal Web Application where Job Seekers and Employers can register, log in, manage profiles, and securely upload/view resumes and company logos.
 
 Built using Node.js, Express, MongoDB, HTML, CSS, JavaScript, and integrated with Cloudinary for file storage.
